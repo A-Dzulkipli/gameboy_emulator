@@ -1,6 +1,7 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
+#include <utility>
 
 namespace gb_emulator {
     template <typename ConcreteMem>
@@ -51,12 +52,34 @@ namespace gb_emulator {
             return val;
         }
 
+        void bus_write(std::uint16_t address, std::uint8_t data) {
+            mem_.write(address, data);
+            tick(4);
+        }
+
         std::uint8_t fetch8() {
             return bus_read(pc_++);
         }
 
+        std::uint16_t fetch16() {
+            std::uint8_t lo = fetch8();
+            std::uint8_t hi = fetch8();
+            return (static_cast<std::uint16_t>(hi) << 8) | lo;
+        }
+
+        void write8(std::uint16_t address, std::uint8_t data) {
+            bus_write(address, data);
+        }
+
+        void write16(std::uint16_t address, std::uint16_t data) {
+            std::uint8_t lo = static_cast<std::uint8_t>(data);
+            std::uint8_t hi = static_cast<std::uint8_t>(data >> 8);
+            write8(address, lo);
+            write8(address + 1, hi);
+        }
+
         enum class r8 {
-            a, b, c, d, e, f, h, l
+            a, b, c, d, e, h, l
         };
 
         std::uint8_t read_r8(r8 source) {
@@ -66,9 +89,9 @@ namespace gb_emulator {
                 case r8::c: return c();
                 case r8::d: return d();
                 case r8::e: return e();
-                case r8::f: return f();
                 case r8::h: return h();
                 case r8::l: return l();
+                default: std::unreachable();
             }
         }
 
@@ -78,8 +101,106 @@ namespace gb_emulator {
                 break;
                 case r8::b: b(val);
                 break;
-
+                case r8::c: c(val);
+                break;
+                case r8::d: d(val);
+                break;
+                case r8::e: e(val);
+                break;
+                case r8::h: h(val);
+                break;
+                case r8::l: l(val);
+                break;
+                default: std::unreachable();
             }
+        }
+
+        void load_r8_r8(r8 dest, r8 source) {
+            write_r8(dest, read_r8(source));
+        }
+
+        void load_r8_n8(r8 dest) {
+            write_r8(dest, fetch8());
+        }
+
+        enum class r16 {
+            bc, de, hl, sp
+        };
+
+        std::uint16_t read_r16(r16 source) {
+            switch(source) {
+                case r16::bc: return bc();
+                case r16::de: return de();
+                case r16::hl: return hl();
+                case r16::sp: return sp();
+                default: std::unreachable();
+            }
+        }
+
+        void write_r16(r16 dest, std::uint16_t val) {
+            switch(dest) {
+                case r16::bc: bc(val);
+                break;
+                case r16::de: de(val);
+                break;
+                case r16::hl: hl(val);
+                break;
+                case r16::sp: sp(val);
+                break;
+                default: std::unreachable();
+            }
+        }
+
+        void load_r16_n16(r16 dest) {
+            std::uint16_t val = fetch16();
+            write_r16(dest, val);
+        }
+
+        void load_hl_r8(r8 source) {
+            write8(hl(), read_r8(source));
+        }
+
+        void load_hl_n8() {
+            write8(hl(), fetch8());
+        }
+
+        void load_r8_hl(r8 dest) {
+            write_r8(dest, bus_read(hl()));
+        }
+
+        // LD [r16],A
+        void load_r16_mem_A(r16 address_register) {
+            write8(read_r16(address_register), a());
+        }
+
+        // LD [n16],A
+        void load_n16_mem_a() {
+            std::uint16_t address = fetch16();
+            write8(address, a());
+        }
+
+        // LDH [n16],A
+        void loadh_n16_mem_a() {
+            std::uint8_t address_lo = fetch8();
+            std::uint16_t address = 0xFF00 | static_cast<std::uint16_t>(address_lo);
+            write8(address, a());
+        }
+
+        // LDH [C],A
+        void loadh_c_mem_a() {
+            std::uint8_t address_lo = c();
+            std::uint16_t address = 0xFF00 | static_cast<std::uint16_t>(address_lo);
+            write(address, a());
+        }
+
+        // LD A,[r16]
+        void load_a_r16_mem(r16 source_address) {
+            write_r8(r8::a, bus_read(read_r16(source_address)));
+        }
+
+        // LD A,[n16]
+        void load_a_n16_mem() {
+
         }
 
     public:
@@ -127,6 +248,30 @@ namespace gb_emulator {
         void hl(std::uint16_t val) {
             h_ = static_cast<uint8_t>(val >> 8);
             l_ = static_cast<uint8_t>(val);
+        }
+
+        std::uint16_t inc_pc() {
+            std::uint16_t val = pc();
+            pc_++;
+            return val;
+        }
+
+        std::uint16_t dec_pc() {
+            pc_--;
+            std::uint16_t val = pc();
+            return val;
+        }
+
+        std::uint16_t inc_sp() {
+            std::uint16_t val = sp();
+            sp_++;
+            return val;
+        }
+
+        std::uint16_t dec_sp() {
+            sp_--;
+            std::uint16_t val = sp();
+            return val;
         }
 
         bool flag_z() const {return f_ & 0x80;}
