@@ -190,7 +190,7 @@ namespace gb_emulator {
         void loadh_c_mem_a() {
             std::uint8_t address_lo = c();
             std::uint16_t address = 0xFF00 | static_cast<std::uint16_t>(address_lo);
-            write(address, a());
+            write8(address, a());
         }
 
         // LD A,[r16]
@@ -200,8 +200,302 @@ namespace gb_emulator {
 
         // LD A,[n16]
         void load_a_n16_mem() {
-
+            std::uint16_t address = fetch16();
+            write_r8(r8::a, bus_read(address));
         }
+
+        // LDH A,[n16]
+        void loadh_a_n16_mem() {
+            std::uint8_t address_8 = fetch8();
+            std::uint16_t address = static_cast<std::uint16_t>(address_8) | 0xFF00;
+            write_r8(r8::a, bus_read(address));
+        }
+
+        // LDH A,[C]
+        void loadh_a_c_mem() {
+            std::uint8_t lo = c();
+            std::uint16_t address = static_cast<std::uint16_t>(lo) | 0xFF00;
+            write_r8(r8::a, bus_read(address));
+        }
+
+        // LD [HLI],A
+        void load_hli_mem_a() {
+            std::uint16_t address = hl();
+            write8(address, a());
+            write_r16(r16::hl, hl() + 1);
+        }
+
+        // LD [HLD],A
+        void load_hld_mem_a() {
+            std::uint16_t address = hl();
+            write8(address, a());
+            write_r16(r16::hl, hl() - 1);
+        }
+
+        // LD A,[HLD]
+        void load_a_hld_mem() {
+            std::uint16_t address = hl();
+            std::uint8_t data = bus_read(address);
+            write_r8(r8::a, data);
+            write_r16(r16::hl, hl() - 1);
+        }
+
+        // LD A,[HLI]
+        void load_a_hli_mem() {
+            std::uint16_t address = hl();
+            std::uint8_t data = bus_read(address);
+            write_r8(r8::a, data);
+            write_r16(r16::hl, hl() + 1);
+        }
+
+        std::uint8_t adc_a_r8_set_flags(std::uint8_t a_data, std::uint8_t source_data, bool carry) {
+            std::uint16_t sum = a_data + source_data + carry;
+            std::uint8_t  result = static_cast<std::uint8_t>(sum);
+            bool half = (a_data & 0xF) + (source_data & 0xF) + carry > 0xF;
+
+            std::uint8_t new_f =
+                  0x80 * (result == 0)
+                | 0x20 * half
+                | 0x10 * (sum > 0xFF);
+            return new_f;
+        }
+
+        //ADC A,r8
+        void adc_a_r8(r8 source) {
+            std::uint8_t a_data = a();
+            std::uint8_t source_data = read_r8(source);
+            bool carry = flag_c();
+            std::uint8_t new_f = adc_a_r8_set_flags(a_data, source_data, carry);
+            std::uint8_t result = a_data + source_data + carry;
+
+            a(result);
+            f(new_f);
+        }
+
+        // ADC A,[HL]
+        void adc_a_hl_mem() {
+            std::uint8_t source_data = bus_read(hl());
+            bool carry = flag_c();
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = adc_a_r8_set_flags(a_data, source_data, carry);
+            std::uint8_t result = a_data + source_data + carry;
+            a(result);
+            f(new_f);
+        }
+
+        // ADC A,n8
+        void adc_a_n8() {
+            std::uint8_t source_data = fetch8();
+            bool carry = flag_c();
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = adc_a_r8_set_flags(a_data, source_data, carry);
+            std::uint8_t result = a_data + source_data + carry;
+            a(result);
+            f(new_f);
+        }
+
+        // ADD A,r8
+        void add_a_r8(r8 source) {
+            std::uint8_t source_data = read_r8(source);
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = adc_a_r8_set_flags(a_data, source_data, false);
+            std::uint8_t result = a_data + source_data;
+            a(result);
+            f(new_f);
+        }
+
+        // ADD A,[HL]
+        void add_a_hl_mem() {
+            std::uint8_t source_data = bus_read(hl());
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = adc_a_r8_set_flags(a_data, source_data, false);
+            std::uint8_t result = a_data + source_data;
+            a(result);
+            f(new_f);
+        }
+
+        // ADD A,n8
+        void add_a_n8() {
+            std::uint8_t source_data = fetch8();
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = adc_a_r8_set_flags(a_data, source_data, false);
+            std::uint8_t result = a_data + source_data;
+            a(result);
+            f(new_f);
+        }
+
+        std::uint8_t cp_a_r8_set_flags(std::uint8_t a_data, std::uint8_t source_data) {
+            std::uint8_t lo_a = a_data & 0xF;
+            std::uint8_t lo_source = source_data & 0xF;
+            std::uint8_t result = a_data - source_data;
+            std::uint8_t new_flag = 0 |
+                0x80*(result == 0) |
+                0x40 |
+                0x20*(lo_a < lo_source) |
+                0x10*(source_data > a_data);
+            return new_flag;
+        }
+
+        // CP A,r8
+        void cp_a_r8(r8 source) {
+            std::uint8_t source_data = read_r8(source);
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = cp_a_r8_set_flags(a_data, source_data);
+            f(new_f);
+        }
+
+        // CP A,[HL]
+        void cp_a_hl_mem() {
+            std::uint8_t source_data = bus_read(hl());
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = cp_a_r8_set_flags(a_data, source_data);
+            f(new_f);
+        }
+
+        // CP A,n8
+        void cp_a_n8() {
+            std::uint8_t source_data = fetch8();
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = cp_a_r8_set_flags(a_data, source_data);
+            f(new_f);
+        }
+
+        std::uint8_t dec_r8_set_flags(std::uint8_t data) {
+            std::uint8_t lo = data & 0xF;
+            std::uint8_t new_flag = 0x80*(data - 1 == 0) | 0x40 | 0x20*(lo == 0) | 0x10*flag_c();
+            return new_flag;
+        }
+
+        // DEC r8
+        void dec_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t result = data - 1;
+            std::uint8_t new_f = dec_r8_set_flags(data);
+            write_r8(reg, result);
+            f(new_f);
+        }
+
+        // DEC [HL]
+        void dec_hl_mem() {
+            std::uint8_t data = bus_read(hl());
+            std::uint8_t result = data - 1;
+            std::uint8_t new_f = dec_r8_set_flags(data);
+            write8(hl(), result);
+            f(new_f);
+        }
+
+        std::uint8_t inc_r8_set_flags(std::uint8_t data) {
+            std::uint8_t lo = data & 0xF;
+            std::uint8_t new_flag = 0x80*(data + 1 == 0) |
+                0x40*(data + 1 == 0) |
+                0x20*(lo + 1 > 0xF) |
+                0x10*flag_c();
+            return new_flag;
+        }
+
+        // INC r8
+        void inc_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t result = data + 1;
+            std::uint8_t new_f = inc_r8_set_flags(data);
+            write_r8(reg, result);
+            f(new_f);
+        }
+
+        // INC [HL]
+        void inc_hl_mem() {
+            std::uint8_t data = bus_read(hl());
+            std::uint8_t result = data + 1;
+            std::uint8_t new_f = inc_r8_set_flags(data);
+            write8(hl(), result);
+            f(new_f);
+        }
+
+        std::uint8_t sbc_a_r8_set_flags(std::uint8_t a_data, std::uint8_t data, bool carry) {
+            std::uint8_t lo_a = a_data & 0xF;
+            std::uint8_t lo_data = data & 0xF;
+            std::uint8_t new_flag = 0x8*(a_data - data - carry == 0) |
+                0x4 |
+                0x2*(lo_a < lo_data + carry) |
+                0x1*(a_data < data + carry);
+            return new_flag;
+        }
+
+        // SBC A,r8
+        void sbc_a_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t a_data = a();
+            bool carry = flag_c();
+            std::uint8_t result = a_data - data - carry;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, carry);
+            a(result);
+            f(new_f);
+        }
+
+        // SBC A,[HL]
+        void sbc_a_hl_mem() {
+            std::uint8_t data = bus_read(hl());
+            std::uint8_t a_data = a();
+            bool carry = flag_c();
+            std::uint8_t result = a_data - data - carry;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, carry);
+            a(result);
+            f(new_f);
+        }
+
+        // SBC A,n8
+        void sbc_a_n8() {
+            std::uint8_t data = fetch8();
+            std::uint8_t a_data = a();
+            bool carry = flag_c();
+            std::uint8_t result = a_data - data - carry;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, carry);
+            a(result);
+            f(new_f);
+        }
+
+        // SUB A,r8
+        void sub_a_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t a_data = a();
+            std::uint8_t result = a_data - data;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, false);
+            a(result);
+            f(new_f);
+        }
+
+        // SUB A,[HL]
+        void sub_a_hl_mem() {
+            std::uint8_t data = bus_read(hl());
+            std::uint8_t a_data = a();
+            std::uint8_t result = a_data - data;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, false);
+            a(result);
+            f(new_f);
+        }
+
+        // SUB A,n8
+        void sub_a_n8() {
+            std::uint8_t data = fetch8();
+            std::uint8_t a_data = a();
+            std::uint8_t result = a_data - data;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, false);
+            a(result);
+            f(new_f);
+        }
+
+        // CPL
+        void cpl() {
+            a(~a());
+            f(0x80*flag_z() | 0x40 | 0x20 | 0x10*flag_c());
+        }
+
+        // LD SP,n16
+        void load_sp_n16() {
+            std::uint16_t data = fetch16();
+            write_r16(r16::sp, data);
+        }
+
 
     public:
         std::uint8_t a() const {return a_;}
