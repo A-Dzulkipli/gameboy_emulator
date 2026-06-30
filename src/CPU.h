@@ -678,6 +678,70 @@ namespace gb_emulator {
             write8(hl(), data);
         }
 
+        // SET u3,r8
+        void set_u3_r8(u3 bit, r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            int bit_num = u3_to_int(bit);
+            data |= (1 << bit_num);
+            write_r8(reg, data);
+        }
+
+        // SET u3,[HL]
+        void set_u3_hl_mem(u3 bit) {
+            std::uint8_t data = bus_read(hl());
+            int bit_num = u3_to_int(bit);
+            data |= (1 << bit_num);
+            write8(hl(), data);
+        }
+
+        std::uint8_t rl_r8_set_flags(std::uint16_t data) {
+            data <<= 1;
+            data |= 0x1*flag_c();
+            std::uint8_t new_flag = 0x80*(static_cast<uint8_t>(data) == 0) |
+                0x40*0 |
+                0x20*0 |
+                0x10*((data & (1 << 8)) != 0);
+            return new_flag;
+        }
+
+        // RL r8
+        void rl_r8(r8 reg) {
+            std::uint16_t data = static_cast<uint16_t>(read_r8(reg));
+            std::uint8_t new_f = rl_r8_set_flags(data);
+            data <<= 1;
+            data |= 0x1*(flag_c());
+            write_r8(reg, static_cast<uint8_t>(data));
+            f(new_f);
+        }
+
+        // RL [HL]
+        void rl_hl_mem() {
+            std::uint16_t data = bus_read(hl());
+            std::uint8_t new_f = rl_r8_set_flags(data);
+            data <<= 1;
+            data |= 0x1*flag_c();
+            write8(hl(), static_cast<uint8_t>(data));
+            f(new_f);
+        }
+
+        std::uint8_t rla_set_flags(std::uint16_t data) {
+            std::uint8_t new_flag = rl_r8_set_flags(data);
+            new_flag &= ~0x80;
+            return new_flag;
+        }
+
+        // RLA
+        void rla() {
+            std::uint16_t data = static_cast<uint16_t>(a());
+            std::uint8_t new_f = rla_set_flags(data);
+            data <<= 1;
+            data |= 0x1*flag_c();
+            a(static_cast<uint8_t>(data));
+            f(new_f);
+        }
+
+
+
         // LD SP,n16
         void load_sp_n16() {
             std::uint16_t data = fetch16();
