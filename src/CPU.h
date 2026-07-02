@@ -30,6 +30,7 @@ namespace gb_emulator {
 
     template <typename Memory>
     class CPU {
+    friend class CPUTest;
     private:
         std::uint8_t a_;
         std::uint8_t b_;
