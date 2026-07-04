@@ -266,3 +266,27 @@ TEST_CASE("LD [HL],r8 - load_hl_r8") {
         }
     }
 }
+
+TEST_CASE("LD [HL],n8 - load_hl_n8") {
+    std::vector<std::uint16_t> mems = {
+        123,
+        965,
+        1092
+    };
+
+    for (const auto address : mems) {
+        CAPTURE(static_cast<int>(address));
+        CPUTest fx;
+        std::uint8_t val = 255;
+        CHECK(fx.cpu.pc() == 0);
+        fx.cpu.write8(fx.cpu.pc(), val);
+        CHECK(fx.cpu.read8(fx.cpu.pc()) == val);
+        CHECK(fx.cpu.pc() == 0);
+        fx.cpu.hl(address);
+        CHECK(fx.cpu.read8(address) == 0);
+        CHECK(fx.cpu.hl() == address);
+        fx.cpu.load_hl_n8();
+        CHECK(fx.cpu.hl() == address);
+        CHECK(fx.cpu.read8(address) == val);
+    }
+}
