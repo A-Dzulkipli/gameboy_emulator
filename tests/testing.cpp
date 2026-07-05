@@ -290,3 +290,66 @@ TEST_CASE("LD [HL],n8 - load_hl_n8") {
         CHECK(fx.cpu.read8(address) == val);
     }
 }
+
+TEST_CASE("LD r8,[HL] - load_r8_hl") {
+    std::vector<std::uint16_t> mems = {
+        123,
+        965,
+        1092
+    };
+
+    for (const auto& reg : all_r8) {
+        for (const auto address : mems) {
+            if (reg == CPU<SimpleMem, NothingClock>::r8::h ||reg == CPU<SimpleMem, NothingClock>::r8::l) continue;
+            CAPTURE(static_cast<int>(reg));
+            CPUTest fx;
+            std::uint8_t val = 255;
+            // initial state
+            CHECK(fx.cpu.read8(address) == 0);
+            CHECK(fx.cpu.read_r8(reg) == 0);
+            CHECK(fx.cpu.hl() == 0);
+            fx.cpu.write8(address, val);
+            fx.cpu.hl(address);
+            // val loaded into address
+            // address loaded into hl
+            // register still 0
+            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.hl() == address);
+            CHECK(fx.cpu.read_r8(reg) == 0);
+            fx.cpu.load_r8_hl(reg);
+            // [address] still val
+            // hl still address
+            // register now val
+            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.hl() == address);
+            CHECK(fx.cpu.read_r8(reg) == val);
+            fx.cpu.load_r8_hl(reg);
+            // idempotence
+            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.hl() == address);
+            CHECK(fx.cpu.read_r8(reg) == val);
+        }
+    }
+}
+
+TEST_CASE("LD [r16],A - load_r16_mem_a") {
+    std::vector<std::uint16_t> mems = {
+        123,
+        965,
+        1092
+    };
+
+    for (const auto& reg : all_r16) {
+        for (const auto address : mems) {
+            CPUTest fx;
+            std::uint8_t val = 255;
+            fx.cpu.a(val);
+            fx.cpu.write_r16(reg, address);
+            CHECK(fx.cpu.read8(address) == 0);
+            fx.cpu.load_r16_mem_a(reg);
+            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.a() == val);
+            CHECK(fx.cpu.read_r16(reg) == address);
+        }
+    }
+}

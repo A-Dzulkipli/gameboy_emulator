@@ -105,9 +105,13 @@ namespace gb_emulator {
         bool flag_c() const {return f_ & 0x10;}
 
         // constructors
-        CPU(Memory& mem, Clock& clock) : a_{0}, b_{0}, c_{0}, d_{0}, e_{0}, f_{0}, h_{0}, l_{0}, pc_{0}, sp_{0}, mem_{mem}, clock_{clock} {}
+        CPU(Memory& mem, Clock& clock) : IME_{false}, a_{0}, b_{0}, c_{0}, d_{0}, e_{0}, f_{0}, h_{0}, l_{0}, pc_{0}, sp_{0}, mem_{mem}, clock_{clock} {}
 
     private:
+        // interrupt flag
+        bool IME_;
+        void IME(bool val) {IME_ = val;};
+
         // registers
         std::uint8_t a_;
         std::uint8_t b_;
@@ -268,6 +272,10 @@ namespace gb_emulator {
             return flag;
         }
 
+        bool select_bit(std::uint8_t data, int bit) {
+            return ((data & (1 << bit)) == 0);
+        }
+
         // bit helpers
         std::uint16_t hi_bit_by_uint8(std::uint8_t val) {
             return 0xFF00 | static_cast<std::uint16_t>(val);
@@ -306,7 +314,7 @@ namespace gb_emulator {
         }
 
         // LD [r16],A
-        void load_r16_mem_A(r16 address_register) {
+        void load_r16_mem_a(r16 address_register) {
             write8(read_r16(address_register), a());
         }
 
@@ -1176,5 +1184,222 @@ namespace gb_emulator {
             write8(hl(), shifted.first);
             f(new_f);
         }
+
+        std::uint8_t swap_bits(std::uint8_t data) {
+            std::uint8_t lo = data << 4;
+            std::uint8_t hi = data >> 4;
+            std::uint8_t swapped = lo | hi;
+            return swapped;
+        }
+
+        std::uint8_t swap_r8_set_flags(std::uint8_t data) {
+            std::uint8_t swapped = swap_bits(data);
+            bool z = (swapped == 0);
+            bool n = false;
+            bool h = false;
+            bool c = false;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // SWAP r8
+        void swap_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t swapped = swap_bits(data);
+            std::uint8_t new_f = swap_r8_set_flags(data);
+            write_r8(reg, swapped);
+            f(new_f);
+        }
+
+        // SWAP [HL]
+        void swap_hl_mem() {
+            std::uint8_t data = read8(hl());
+            std::uint8_t swapped = swap_bits(data);
+            std::uint8_t new_f = swap_r8_set_flags(data);
+            write8(hl(), swapped);
+            f(new_f);
+        }
+
+        // ADD HL,SP
+        void add_hl_sp() {
+            std::uint8_t new_f = add_hl_r16_set_flags(hl(), sp());
+            f(new_f);
+            hl(hl() + sp());
+        }
+
+        std::uint8_t add_sp_e8_set_flags(std::uint16_t data, std::int8_t offset) {
+            std::uint8_t lo_data = static_cast<std::uint8_t>(data);
+            std::uint8_t unsigned_offset = static_cast<std::uint8_t>(offset);
+            std::uint8_t lo_data_nibble = 0xF & lo_data;
+            std::uint8_t unsigned_offset_nibble = 0xF & unsigned_offset;
+            bool z = false;
+            bool n = false;
+            bool h = (lo_data_nibble + unsigned_offset_nibble > 0xF);
+            bool c = (static_cast<std::uint16_t>(lo_data) + static_cast<std::uint16_t>(unsigned_offset) > 0xFF);
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // ADD SP,e8
+        void add_sp_e8() {
+            std::int8_t signed_offset = static_cast<std::int8_t>(fetch8());
+            std::uint16_t data = sp();
+            std::uint16_t result = data + signed_offset;
+            std::uint8_t new_f = add_sp_e8_set_flags(data, signed_offset);
+            sp(result);
+            f(new_f);
+            tick(8);
+        }
+
+        // DEC SP
+        void dec_sp() {
+            sp(sp() - 1);
+            tick(4);
+        }
+
+        // INC SP
+        void inc_sp() {
+            sp(sp() + 1);
+            tick(4);
+        }
+
+        // LD SP,n16
+        void load_sp_n16() {
+            std::uint16_t val = fetch16();
+            sp(val);
+        }
+
+        // LD [n16],SP
+        void load_n16_mem_sp() {
+            std::uint16_t address = fetch16();
+            write16(address, sp());
+        }
+
+        // LD HL,SP+e8
+        void load_hl_sp_e8() {
+            std::int8_t signed_offset = static_cast<std::int8_t>(fetch8());
+            std::uint16_t data = sp();
+            std::uint16_t result = data + signed_offset;
+            std::uint8_t new_f = add_sp_e8_set_flags(data, signed_offset);
+            hl(result);
+            f(new_f);
+            tick(4);
+        }
+
+        // LD SP,HL
+        void load_sp_hl() {
+            hl(sp());
+            tick(4);
+        }
+
+        std::uint16_t pop16() {
+            std::uint8_t lo = read8(sp());
+            sp(sp() + 1);
+            std::uint8_t hi = read8(sp());
+            sp(sp() + 1);
+            std::uint16_t data = (static_cast<std::uint16_t>(hi) << 8) | static_cast<std::uint16_t>(lo);
+            return data;
+        }
+
+        void push16(std::uint16_t data) {
+            std::uint8_t lo = static_cast<std::uint8_t>(data);
+            std::uint8_t hi = static_cast<std::uint8_t>(data >> 8);
+            tick(4);
+            sp(sp() - 1);
+            write8(sp(), hi);
+            sp(sp() - 1);
+            write8(sp(), lo);
+        }
+
+        // POP AF
+        void pop_af() {
+            std::uint16_t data = pop16();
+            af(data);
+        }
+
+        // POP r16
+        void pop_r16(r16 reg) {
+            std::uint16_t data = pop16();
+            write_r16(reg, data);
+        }
+
+        // PUSH AF
+        void push_af() {
+            std::uint16_t data = af();
+            push16(data);
+        }
+
+        // PUSH r16
+        void push_r16(r16 reg) {
+            std::uint16_t data = read_r16(reg);
+            push16(data);
+        }
+
+        // DI
+        void di() {
+            IME(false);
+        }
+
+        // EI
+        void ei() {
+            IME(true);
+        }
+
+        // HALT
+
+        // CALL n16
+        void call_n16() {
+            std::uint16_t jump_address = fetch16();
+            std::uint16_t address = pc();
+            push16(address);
+            pc(jump_address);
+        }
+
+        enum class cc {
+            z, nz, c, nc
+        };
+
+        bool test_cc(cc condition) {
+            switch (condition) {
+                case cc::z: return flag_z();
+                case cc::nz: return !flag_z();
+                case cc::c: return flag_c();
+                case cc::nc: return !flag_c();
+                default: std::unreachable();
+            }
+        }
+
+        // CALL cc,n16
+        void call_cc_n16(cc condition) {
+            std::uint16_t jump_address = fetch16();
+            std::uint16_t address = pc();
+            if (test_cc(condition)) {
+                push16(address);
+                pc(jump_address);
+            }
+        }
+
+        // JP HL
+        void jp_hl() {
+            std::uint16_t jump_address = hl();
+            pc(jump_address);
+        }
+
+        // JP n16
+        void jp_n16() {
+            std::uint16_t jump_address = fetch16();
+            pc(jump_address);
+        }
+
+        // JP cc,n16
+        void jp_cc_n16(cc condition) {
+            std::uint16_t jump_address = fetch16();
+            if (test_cc(condition)) pc(jump_address);
+        }
+
+        // JR n16
+        // void jr_n16() {
+
+        // }
     };
 }
