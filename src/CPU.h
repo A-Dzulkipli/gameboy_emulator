@@ -569,5 +569,612 @@ namespace gb_emulator {
             write8(hl(), result);
             f(new_f);
         }
+
+        std::uint8_t sbc_a_r8_set_flags(std::uint8_t a_data, std::uint8_t data, bool carry) {
+            std::uint8_t lo_a = a_data & 0xF;
+            std::uint8_t lo_data = data & 0xF;
+            bool z = (a_data - data - carry == 0);
+            bool n = 1;
+            bool h = (lo_a < lo_data + carry);
+            bool c = (a_data < data + carry);
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            // std::uint8_t new_flag = 0x80*(a_data - data - carry == 0) |
+            //     0x40 |
+            //     0x20*(lo_a < lo_data + carry) |
+            //     0x10*(a_data < data + carry);
+            return new_flag;
+        }
+
+        // SBC A,r8
+        void sbc_a_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t a_data = a();
+            bool carry = flag_c();
+            std::uint8_t result = a_data - data - carry;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, carry);
+            a(result);
+            f(new_f);
+        }
+
+        // SBC A,[HL]
+        void sbc_a_hl_mem() {
+            std::uint8_t data = read8(hl());
+            std::uint8_t a_data = a();
+            bool carry = flag_c();
+            std::uint8_t result = a_data - data - carry;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, carry);
+            a(result);
+            f(new_f);
+        }
+
+        // SBC A,n8
+        void sbc_a_n8() {
+            std::uint8_t data = fetch8();
+            std::uint8_t a_data = a();
+            bool carry = flag_c();
+            std::uint8_t result = a_data - data - carry;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, carry);
+            a(result);
+            f(new_f);
+        }
+
+        // SUB A,r8
+        void sub_a_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t a_data = a();
+            std::uint8_t result = a_data - data;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, false);
+            a(result);
+            f(new_f);
+        }
+
+        // SUB A,[HL]
+        void sub_a_hl_mem() {
+            std::uint8_t data = read8(hl());
+            std::uint8_t a_data = a();
+            std::uint8_t result = a_data - data;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, false);
+            a(result);
+            f(new_f);
+        }
+
+        // SUB A,n8
+        void sub_a_n8() {
+            std::uint8_t data = fetch8();
+            std::uint8_t a_data = a();
+            std::uint8_t result = a_data - data;
+            std::uint8_t new_f = sbc_a_r8_set_flags(a_data, data, false);
+            a(result);
+            f(new_f);
+        }
+
+        std::uint8_t add_hl_r16_set_flags(std::uint16_t hl_data, std::uint16_t data) {
+            std::uint16_t hl_data_up_to_bit_11 = hl_data & 4095;
+            std::uint16_t data_up_to_bit_11 = data & 4095;
+            bool z = flag_z();
+            bool n = false;
+            bool h = (hl_data_up_to_bit_11 + data_up_to_bit_11 >= (1 << 12));
+            bool c = (hl_data + data >= (1 << 16));
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            // std::uint8_t new_flag = 0x80*flag_z() |
+            //     0x40*0 |
+            //     0x20*(hl_data_up_to_bit_11 + data_up_to_bit_11 >= (1 << 12)) |
+            //     0x10*(hl_data + data >= (1 << 16));
+            return new_flag;
+        }
+
+        // ADD HL,r16
+        void add_hl_r16(r16 reg) {
+            tick(4);
+            std::uint16_t data = read_r16(reg);
+            std::uint16_t hl_data = hl();
+            std::uint8_t new_f = add_hl_r16_set_flags(hl_data, data);
+            hl(data + hl_data);
+            f(new_f);
+        }
+
+        // DEC r16
+        void dec_r16(r16 reg) {
+            tick(4);
+            std::uint16_t data = read_r16(reg);
+            write_r16(reg, data-1);
+        }
+
+        // INC r16
+        void inc_r16(r16 reg) {
+            tick(4);
+            std::uint16_t data = read_r16(reg);
+            write_r16(reg, data+1);
+        }
+
+        std::uint8_t and_a_r8_set_flags(std::uint8_t a_data, std::uint8_t data) {
+            bool z = ((a_data & data) == 0);
+            bool n = false;
+            bool h = true;
+            bool c = false;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            // std::uint8_t new_flag = 0x80*((a_data & data) == 0) |
+            //     0x40*0 |
+            //     0x20 |
+            //     0x10*0;
+            return new_flag;
+        }
+
+        // AND A,r8
+        void and_a_r8(r8 source) {
+            std::uint8_t data = read_r8(source);
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = and_a_r8_set_flags(a_data, data);
+            a(data & a_data);
+            f(new_f);
+        }
+
+        // AND A,[HL]
+        void and_a_hl_mem() {
+            std::uint8_t data = read8(hl());
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = and_a_r8_set_flags(a_data, data);
+            a(data & a_data);;
+            f(new_f);
+        }
+
+        // AND A,n8
+        void and_a_n8() {
+            std::uint8_t data = fetch8();
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = and_a_r8_set_flags(a_data, data);
+            a(data & a_data);;
+            f(new_f);
+        }
+
+        // CPL
+        void cpl() {
+            a(~a());
+            bool z = flag_z();
+            bool n = true;
+            bool h = true;
+            bool c = flag_c();
+            std::uint8_t new_f = set_flag(z, n, h, c);
+            // f(0x80*flag_z() | 0x40 | 0x20 | 0x10*flag_c());
+            f(new_f);
+        }
+
+        std::uint8_t or_a_r8_set_flags(std::uint8_t a_data, std::uint8_t data) {
+            bool z = ((a_data | data) == 0);
+            bool n = false;
+            bool h = false;
+            bool c = false;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            // std::uint8_t new_flag = 0x80*((a_data | data) == 0);
+            return new_flag;
+        }
+
+        // OR A,r8
+        void or_a_r8(r8 source) {
+            std::uint8_t data = read_r8(source);
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = or_a_r8_set_flags(a_data, data);
+            a(a_data | data);
+            f(new_f);
+        }
+
+        // OR A,[HL]
+        void or_a_hl_mem() {
+            std::uint8_t data = read8(hl());
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = or_a_r8_set_flags(a_data, data);
+            a(a_data | data);
+            f(new_f);
+        }
+
+        // OR A,n8
+        void or_a_n8() {
+            std::uint8_t data = fetch8();
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = or_a_r8_set_flags(a_data, data);
+            a(a_data | data);
+            f(new_f);
+        }
+
+        std::uint8_t xor_a_r8_set_flags(std::uint8_t a_data, std::uint8_t data) {
+            bool z = ((a_data ^ data) == 0);
+            bool n = false;
+            bool h = false;
+            bool c = false;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            // std::uint8_t new_flag = 0x80*((a_data ^ data) == 0);
+            return new_flag;
+        }
+
+        // XOR A,r8
+        void xor_a_r8(r8 source) {
+            std::uint8_t data = read_r8(source);
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = xor_a_r8_set_flags(a_data, data);
+            a(a_data ^ data);
+            f(new_f);
+        }
+
+        // XOR A,[HL]
+        void xor_a_hl_mem() {
+            std::uint8_t data = read8(hl());
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = xor_a_r8_set_flags(a_data, data);
+            a(a_data ^ data);
+            f(new_f);
+        }
+
+        // XOR A,n8
+        void xor_a_n8() {
+            std::uint8_t data = fetch8();
+            std::uint8_t a_data = a();
+            std::uint8_t new_f = xor_a_r8_set_flags(a_data, data);
+            a(a_data ^ data);
+            f(new_f);
+        }
+
+        std::uint8_t bit_u3_r8_set_flags(int bit_num, std::uint8_t data) {
+            bool z = ((data & (1 << bit_num)) == 0);
+            bool n = false;
+            bool h = true;
+            bool c = false;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            // std::uint8_t new_flag = 0x80*((data & (1 << bit_num)) == 0) | 0x20;
+            return new_flag;
+        }
+
+        // BIT u3,r8
+        void bit_u3_r8(int bit, r8 reg) {
+            // int bit_num = u3_to_int(bit);
+            std::uint8_t data = read_r8(reg);
+            std::uint8_t new_f = bit_u3_r8_set_flags(bit, data);
+            f(new_f);
+        }
+
+        // BIT u3,[HL]
+        void bit_u3_hl_mem(int bit) {
+            // int bit_num = u3_to_int(bit);
+            std::uint8_t data = read8(hl());
+            std::uint8_t new_f = bit_u3_r8_set_flags(bit, data);
+            f(new_f);
+        }
+
+        // RES u3,r8
+        void res_u3_r8(int bit, r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            // int bit_num = u3_to_int(bit);
+            data &= ~(1 << bit);
+            write_r8(reg, data);
+        }
+
+        // RES u3,[HL]
+        void res_u3_hl_mem(int bit) {
+            std::uint8_t data = bus_read(hl());
+            // int bit_num = u3_to_int(bit);
+            data &= ~(1 << bit);
+            write8(hl(), data);
+        }
+
+        std::pair<std::uint8_t, bool> rotate_left_through(std::uint8_t data, bool bit) {
+            std::uint8_t rotated = (data << 1) | 0x1*bit;
+            bool new_bit = data >> 7;
+            return std::make_pair(rotated, new_bit);
+        }
+
+        std::pair<std::uint8_t, bool> rotate_right_through(std::uint8_t data, bool bit) {
+            std::uint8_t rotated = (data >> 1) | (1 << 8)*bit;
+            bool new_bit = ((0x1 & data) != 0);
+            return std::make_pair(rotated, new_bit);
+        }
+
+        std::pair<std::uint8_t, bool> rotate_left(std::uint8_t data) {
+            std::uint8_t rotated = (data << 1) | (data >> 7);
+            bool new_bit = (data >> 7) != 0;
+            return std::make_pair(rotated, new_bit);
+        }
+
+        std::pair<std::uint8_t, bool> rotate_right(std::uint8_t data) {
+            std::uint8_t rotated = (data >> 1) | (data << 7);
+            bool new_bit = (data << 7) != 0;
+            return std::make_pair(rotated, new_bit);
+        }
+
+        std::uint8_t rl_r8_set_flags(std::uint8_t data, bool carry) {
+            auto rotated = rotate_left_through(data, carry);
+            bool z = (rotated.first == 0);
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RL r8
+        void rl_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            bool carry = flag_c();
+            std::uint8_t new_f = rl_r8_set_flags(data, carry);
+            auto rotated = rotate_left_through(data, carry);
+            f(new_f);
+            write_r8(reg, rotated.first);
+        }
+
+        // RL [HL]
+        void rl_hl_mem() {
+            std::uint8_t data = read8(hl());
+            bool carry = flag_c();
+            std::uint8_t new_f = rl_r8_set_flags(data, carry);
+            auto rotated = rotate_left_through(data, carry);
+            f(new_f);
+            write8(hl(), rotated.first);
+        }
+
+        std::uint8_t rla_set_flags(std::uint8_t a_data, bool carry) {
+            auto rotated = rotate_left_through(a_data, carry);
+            bool z = false;
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RLA
+        void rla() {
+            std::uint8_t data = a();
+            bool carry = flag_c();
+            std::uint8_t new_f = rla_set_flags(data, carry);
+            auto rotated = rotate_left_through(data, carry);
+            f(new_f);
+            a(rotated.first);
+        }
+
+        std::uint8_t rlc_r8_set_flags(std::uint8_t data) {
+            auto rotated = rotate_left(data);
+            bool z = (rotated.first == 0);
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RLC r8
+        void rlc_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            auto rotated = rotate_left(data);
+            std::uint8_t new_f = rlc_r8_set_flags(data);
+            f(new_f);
+            write_r8(reg, rotated.first);
+        }
+
+        // RLC [HL]
+        void rlc_hl_mem() {
+            std::uint8_t data = read8(hl());
+            auto rotated = rotate_left(data);
+            std::uint8_t new_f = rlc_r8_set_flags(data);
+            f(new_f);
+            write8(hl(), rotated.first);
+        }
+
+        std::uint8_t rlca_set_flags(std::uint8_t data) {
+            auto rotated = rotate_left(data);
+            bool z = false;
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RLCA
+        void rlca() {
+            std::uint8_t data = a();
+            auto rotated = rotate_left(data);
+            std::uint8_t new_f = rlca_set_flags(data);
+            a(rotated.first);
+            f(new_f);
+        }
+
+        std::uint8_t rr_r8_set_flags(std::uint8_t data, bool carry) {
+            auto rotated = rotate_right_through(data, carry);
+            bool z = (rotated.first == 0);
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RR r8
+        void rr_r8(r8 reg) {
+            bool carry = flag_c();
+            std::uint8_t data = read_r8(reg);
+            auto rotated = rotate_right_through(data, carry);
+            std::uint8_t new_f = rr_r8_set_flags(data, carry);
+            write_r8(reg, rotated.first);
+            f(new_f);
+        }
+
+        // RR [HL]
+        void rr_hl_mem() {
+            bool carry = flag_c();
+            std::uint8_t data = read8(hl());
+            auto rotated = rotate_right_through(data, carry);
+            std::uint8_t new_f = rr_r8_set_flags(data, carry);
+            write8(hl(), rotated.first);
+            f(new_f);
+        }
+
+        std::uint8_t rra_set_flags(std::uint8_t data, bool carry) {
+            auto rotated = rotate_right_through(data, carry);
+            bool z = false;
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RRA
+        void rra() {
+            bool carry = flag_c();
+            std::uint8_t data = a();
+            auto rotated = rotate_right_through(data, carry);
+            std::uint8_t new_f = rra_set_flags(data, carry);
+            a(rotated.first);
+            f(new_f);
+        }
+
+        std::uint8_t rrc_r8_set_flags(std::uint8_t data) {
+            auto rotated = rotate_right(data);
+            bool z = (rotated.first == 0);
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RRC r8
+        void rrc_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            auto rotated = rotate_right(data);
+            std::uint8_t new_f = rrc_r8_set_flags(data);
+            write_r8(reg, rotated.first);
+            f(new_f);
+        }
+
+        // RRC [HL]
+        void rrc_hl_mem() {
+            std::uint8_t data = read8(hl());
+            auto rotated = rotate_right(data);
+            std::uint8_t new_f = rrc_r8_set_flags(data);
+            write8(hl(), rotated.first);
+            f(new_f);
+        }
+
+        std::uint8_t rrca_set_flags(std::uint8_t data) {
+            auto rotated = rotate_right(data);
+            bool z = false;
+            bool n = false;
+            bool h = false;
+            bool c = rotated.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // RRCA
+        void rrca() {
+            std::uint8_t data = a();
+            auto rotated = rotate_right(data);
+            std::uint8_t new_f = rrca_set_flags(data);
+            a(rotated.first);
+            f(new_f);
+        }
+
+        std::pair<std::uint8_t, bool> shift_left_arithmetically(std::uint8_t data) {
+            std::uint8_t shifted = data << 1;
+            bool carry = (((1 << 7) & data) != 0);
+            return std::make_pair(shifted, carry);
+        }
+
+        std::pair<std::uint8_t, bool> shift_right_arithmetically(std::uint8_t data) {
+            std::uint8_t shifted = data >> 1;
+            bool new_carry = ((data & 1) != 0);
+            bool top_bit = ((data & (1 << 7)) != 0);
+            shifted = shifted | (1 << 7)*top_bit;
+            return std::make_pair(shifted, new_carry);
+        }
+
+        std::pair<std::uint8_t, bool> shift_right_logically(std::uint8_t data) {
+            std::uint8_t shifted = data >> 1;
+            bool new_carry = ((data & 1) != 0);
+            return std::make_pair(shifted, new_carry);
+        }
+
+        std::uint8_t sla_r8_set_flags(std::uint8_t data) {
+            auto shifted = shift_left_arithmetically(data);
+            bool z = (shifted.first == 0);
+            bool n = false;
+            bool h = false;
+            bool c = shifted.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // SLA r8
+        void sla_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            auto shifted = shift_left_arithmetically(data);
+            std::uint8_t new_f = sla_r8_set_flags(data);
+            write_r8(reg, shifted.first);
+            f(new_f);
+        }
+
+        // SLA [HL]
+        void sla_hl_mem() {
+            std::uint8_t data = read8(hl());
+            auto shifted = shift_left_arithmetically(data);
+            std::uint8_t new_f = sla_r8_set_flags(data);
+            write8(hl(), shifted.first);
+            f(new_f);
+        }
+
+        std::uint8_t sra_r8_set_flags(std::uint8_t data) {
+            auto shifted = shift_right_arithmetically(data);
+            bool z = (shifted.first == 0);
+            bool n = false;
+            bool h = false;
+            bool c = shifted.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // SRA r8
+        void sra_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            auto shifted = shift_right_arithmetically(data);
+            std::uint8_t new_f = sra_r8_set_flags(data);
+            write_r8(reg, shifted.first);
+            f(new_f);
+        }
+
+        // SRA [HL]
+        void sra_hl_mem() {
+            std::uint8_t data = read8(hl());
+            auto shifted = shift_right_arithmetically(data);
+            std::uint8_t new_f = sra_r8_set_flags(data);
+            write8(hl(), shifted.first);
+            f(new_f);
+        }
+
+        std::uint8_t srl_r8_set_flags(std::uint8_t data) {
+            auto shifted = shift_right_logically(data);
+            bool z = (shifted.first == 0);
+            bool n = false;
+            bool h = false;
+            bool c = shifted.second;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // SRL r8
+        void srl_r8(r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            auto shifted = shift_right_logically(data);
+            std::uint8_t new_f = srl_r8_set_flags(data);
+            write_r8(reg, shifted.first);
+            f(new_f);
+        }
+
+        // SRL [HL]
+        void srl_hl_mem() {
+            std::uint8_t data = read8(hl());
+            auto shifted = shift_right_logically(data);
+            std::uint8_t new_f = srl_r8_set_flags(data);
+            write8(hl(), shifted.first);
+            f(new_f);
+        }
     };
 }
