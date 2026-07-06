@@ -124,6 +124,9 @@ namespace gb_emulator {
         std::uint16_t pc_;
         std::uint16_t sp_;
 
+        static constexpr std::uint16_t ie_ = 0xFFFF;
+        static constexpr std::uint16_t if_ = 0xFF0F;
+
         // templated parameters
         Memory& mem_;
         Clock& clock_;
@@ -143,9 +146,17 @@ namespace gb_emulator {
             return val;
         }
 
+        std::uint8_t bus_read_no_tick(std::uint16_t address) {
+            return mem_.read(address);
+        }
+
         void bus_write(std::uint16_t address, std::uint8_t data) {
             mem_.write(address, data);
             tick(4);
+        }
+
+        void bus_write_no_tick(std::uint16_t address, std::uint8_t data) {
+            mem_.write(address, data);
         }
 
         // instruction fetching
@@ -174,6 +185,46 @@ namespace gb_emulator {
             std::uint8_t hi = static_cast<std::uint8_t>(data >> 8);
             write8(address, lo);
             write8(address + 1, hi);
+        }
+
+        // interrupt locations
+        std::uint8_t interrupt_e() {
+            return read8(ie_);
+        }
+
+        enum class InterruptBit {
+            vblank, lcd, timer, serial, joypad
+        };
+
+        int interrupt_bit_map(InterruptBit bit) {
+            switch (bit) {
+                case InterruptBit::vblank: return 0;
+                case InterruptBit::lcd: return 1;
+                case InterruptBit::timer: return 2;
+                case InterruptBit::serial: return 3;
+                case InterruptBit::joypad: return 4;
+                default: std::unreachable();
+            }
+        }
+
+        bool interrupt_e_no_tick(InterruptBit bit) {
+            return select_bit(bus_read_no_tick(ie_), interrupt_bit_map(bit));
+        }
+
+        void interrupt_e(std::uint8_t data) {
+            write8(ie_, (data & 0x1F) | 0xE0);
+        }
+
+        std::uint8_t interrupt_f() {
+            return read8(if_);
+        }
+
+        bool interrupt_f_no_tick(InterruptBit bit) {
+            return select_bit(bus_read_no_tick(if_), interrupt_bit_map(bit));
+        }
+
+        void interrupt_f(std::uint8_t data) {
+            write8(if_, (data & 0x1F) | 0xE0);
         }
 
         // 8 bit register helpers
@@ -273,7 +324,7 @@ namespace gb_emulator {
         }
 
         bool select_bit(std::uint8_t data, int bit) {
-            return ((data & (1 << bit)) == 0);
+            return ((data & (1 << bit)) != 0);
         }
 
         // bit helpers
@@ -581,7 +632,7 @@ namespace gb_emulator {
         std::uint8_t sbc_a_r8_set_flags(std::uint8_t a_data, std::uint8_t data, bool carry) {
             std::uint8_t lo_a = a_data & 0xF;
             std::uint8_t lo_data = data & 0xF;
-            bool z = (a_data - data - carry == 0);
+            bool z = ((a_data - data - carry) % (1 << 8) == 0);
             bool n = 1;
             bool h = (lo_a < lo_data + carry);
             bool c = (a_data < data + carry);
@@ -825,7 +876,7 @@ namespace gb_emulator {
             bool z = ((data & (1 << bit_num)) == 0);
             bool n = false;
             bool h = true;
-            bool c = false;
+            bool c = flag_c();
             std::uint8_t new_flag = set_flag(z, n, h, c);
             // std::uint8_t new_flag = 0x80*((data & (1 << bit_num)) == 0) | 0x20;
             return new_flag;
@@ -863,6 +914,20 @@ namespace gb_emulator {
             write8(hl(), data);
         }
 
+        // SET u3,r8
+        void set_u3_r8(int bit, r8 reg) {
+            std::uint8_t data = read_r8(reg);
+            data = set_bit(data, bit, true);
+            write_r8(reg, data);
+        }
+
+        // SET u3,[HL]
+        void set_u3_hl_mem(int bit) {
+            std::uint8_t data = read8(hl());
+            set_bit(data, bit, true);
+            write8(hl(), data);
+        }
+
         std::pair<std::uint8_t, bool> rotate_left_through(std::uint8_t data, bool bit) {
             std::uint8_t rotated = (data << 1) | 0x1*bit;
             bool new_bit = data >> 7;
@@ -870,7 +935,7 @@ namespace gb_emulator {
         }
 
         std::pair<std::uint8_t, bool> rotate_right_through(std::uint8_t data, bool bit) {
-            std::uint8_t rotated = (data >> 1) | (1 << 8)*bit;
+            std::uint8_t rotated = (data >> 1) | (1 << 7)*bit;
             bool new_bit = ((0x1 & data) != 0);
             return std::make_pair(rotated, new_bit);
         }
@@ -1288,7 +1353,7 @@ namespace gb_emulator {
 
         // LD SP,HL
         void load_sp_hl() {
-            hl(sp());
+            sp(hl());
             tick(4);
         }
 
@@ -1398,8 +1463,73 @@ namespace gb_emulator {
         }
 
         // JR n16
-        // void jr_n16() {
+        void jr_n16() {
+            std::int8_t offset = static_cast<std::int8_t>(fetch8());
+            std::uint16_t new_address = static_cast<std::uint16_t>(static_cast<int>(pc()) + static_cast<int>(offset));
+            pc(new_address);
+            tick(4);
+        }
 
-        // }
+        // JR cc,n16
+        void jr_cc_n16(cc condition) {
+            std::int8_t offset = static_cast<std::int8_t>(fetch8());
+            if (test_cc(condition)) {
+                std::uint16_t new_address = static_cast<std::uint16_t>(static_cast<int>(pc()) + static_cast<int>(offset));
+                pc(new_address);
+                tick(4);
+            }
+        }
+
+        // RET cc
+        void ret_cc(cc condition) {
+            if (test_cc(condition)) {
+                pc(pop16());
+            }
+        }
+
+        // RET
+        void ret() {
+            pc(pop16());
+        }
+
+        // RETI
+        void reti() {
+            ei();
+            ret();
+        }
+
+        // RST vec
+        void rst_vec(std::uint16_t address) {
+            push16(pc());
+            pc(address);
+        }
+
+        // CCF
+        void ccf() {
+            bool z = flag_z();
+            bool n = false;
+            bool h = false;
+            bool c = !flag_c();
+            std::uint8_t new_f = set_flag(z, n, h, c);
+            f(new_f);
+        }
+
+        // SCF
+        void scf() {
+            bool z = flag_z();
+            bool n = false;
+            bool h = false;
+            bool c = true;
+            std::uint8_t new_f = set_flag(z, n, h, c);
+            f(new_f);
+        }
+
+        // NOP
+        void nop() {}
+
+        // STOP
+        void stop() {
+            fetch8();
+        }
     };
 }
