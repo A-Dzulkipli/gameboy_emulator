@@ -105,7 +105,7 @@ namespace gb_emulator {
         bool flag_c() const {return f_ & 0x10;}
 
         // constructors
-        CPU(Memory& mem, Clock& clock) : IME_{false}, a_{0}, b_{0}, c_{0}, d_{0}, e_{0}, f_{0}, h_{0}, l_{0}, pc_{0}, sp_{0}, mem_{mem}, clock_{clock} {}
+        CPU(Memory& mem, Clock& clock) : IME_{false}, a_{0}, b_{0}, c_{0}, d_{0}, e_{0}, f_{0}, h_{0}, l_{0}, pc_{0}, sp_{0}, halted_{false}, halt_bug_{false}, mem_{mem}, clock_{clock} {}
 
     private:
         // interrupt flag
@@ -123,6 +123,9 @@ namespace gb_emulator {
         std::uint8_t l_;
         std::uint16_t pc_;
         std::uint16_t sp_;
+
+        bool halted_;
+        bool halt_bug_;
 
         static constexpr std::uint16_t ie_ = 0xFFFF;
         static constexpr std::uint16_t if_ = 0xFF0F;
@@ -1411,6 +1414,17 @@ namespace gb_emulator {
         }
 
         // HALT
+        void halt() {
+            std::uint8_t pending_interrupts = bus_read_no_tick(ie_) & bus_read_no_tick(if_) & 0x1F;
+            bool pending = (pending_interrupts == 0);
+            if (IME()) {
+                halted_ = true;
+            } else if (pending) {
+                halted_ = true;
+            } else {
+                halt_bug_ = true;
+            }
+        }
 
         // CALL n16
         void call_n16() {
@@ -1530,6 +1544,40 @@ namespace gb_emulator {
         // STOP
         void stop() {
             fetch8();
+        }
+
+        std::uint8_t daa_set_flags(std::uint8_t a_data, bool carry_flag) {
+            bool z = (a_data == 0);
+            bool n = flag_n();
+            bool h = false;
+            bool c = carry_flag;
+            std::uint8_t new_flag = set_flag(z, n, h, c);
+            return new_flag;
+        }
+
+        // DAA
+        void daa() {
+            bool n = flag_n();
+            bool h = flag_h();
+            bool c = flag_c();
+            std::uint8_t a_data = a();
+            std::uint8_t adjustment = 0;
+            bool carry_flag = flag_c();
+            if (n) {
+                if (h) adjustment += 0x6;
+                if (c) adjustment += 0x60;
+                a_data -= adjustment;
+            } else {
+                if (h || ((a_data & 0xF) > 9)) adjustment += 0x6;
+                if (c || (a_data > 0x99)) {
+                    adjustment += 0x60;
+                    carry_flag = true;
+                }
+                a_data += adjustment;
+            }
+            std::uint8_t new_f = daa_set_flags(a_data, carry_flag);
+            f(new_f);
+            a(a_data);
         }
     };
 }
