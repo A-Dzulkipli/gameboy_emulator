@@ -196,22 +196,22 @@ namespace gb_emulator {
         }
 
         enum class InterruptBit {
-            vblank, lcd, timer, serial, joypad
+            vblank = 0, lcd = 1, timer = 2, serial = 3, joypad = 4
         };
 
-        int interrupt_bit_map(InterruptBit bit) {
-            switch (bit) {
-                case InterruptBit::vblank: return 0;
-                case InterruptBit::lcd: return 1;
-                case InterruptBit::timer: return 2;
-                case InterruptBit::serial: return 3;
-                case InterruptBit::joypad: return 4;
-                default: std::unreachable();
-            }
-        }
+        // int interrupt_bit_map(InterruptBit bit) {
+        //     switch (bit) {
+        //         case InterruptBit::vblank: return 0;
+        //         case InterruptBit::lcd: return 1;
+        //         case InterruptBit::timer: return 2;
+        //         case InterruptBit::serial: return 3;
+        //         case InterruptBit::joypad: return 4;
+        //         default: std::unreachable();
+        //     }
+        // }
 
         bool interrupt_e_no_tick(InterruptBit bit) {
-            return select_bit(bus_read_no_tick(ie_), interrupt_bit_map(bit));
+            return select_bit(bus_read_no_tick(ie_), static_cast<int>(bit));
         }
 
         void interrupt_e(std::uint8_t data) {
@@ -223,7 +223,7 @@ namespace gb_emulator {
         }
 
         bool interrupt_f_no_tick(InterruptBit bit) {
-            return select_bit(bus_read_no_tick(if_), interrupt_bit_map(bit));
+            return select_bit(bus_read_no_tick(if_), static_cast<int>(bit));
         }
 
         void interrupt_f(std::uint8_t data) {
@@ -232,7 +232,7 @@ namespace gb_emulator {
 
         // 8 bit register helpers
         enum class r8 {
-            a, b, c, d, e, h, l
+            a = 7, b = 0, c = 1, d = 2, e = 3, h = 4, l = 5
         };
 
         std::uint8_t read_r8(r8 source) {
@@ -270,7 +270,7 @@ namespace gb_emulator {
 
         // 16 bit register helpers
         enum class r16 {
-            bc, de, hl, sp
+            bc = 0, de = 1, hl = 2, sp = 3
         };
 
         std::uint16_t read_r16(r16 source) {
@@ -1435,7 +1435,7 @@ namespace gb_emulator {
         }
 
         enum class cc {
-            z, nz, c, nc
+            z = 1, nz = 0, c = 3, nc = 2
         };
 
         bool test_cc(cc condition) {
@@ -1578,6 +1578,251 @@ namespace gb_emulator {
             std::uint8_t new_f = daa_set_flags(a_data, carry_flag);
             f(new_f);
             a(a_data);
+        }
+
+        // op code decoder and helpers
+        void op_code_decoder(std::uint8_t op_code) {
+            switch (op_code) {
+                //nop
+                case 0b00000000: return nop();
+                // ld r16, n16
+                case 0b00000001: return load_r16_n16(static_cast<r16>(0));
+                case 0b00010001: return load_r16_n16(static_cast<r16>(1));
+                case 0b00100001: return load_r16_n16(static_cast<r16>(2));
+                case 0b00110001: return load_r16_n16(static_cast<r16>(3));
+                // ld [r16], a
+                case 0b00000010: return load_r16_mem_a(static_cast<r16>(0));
+                case 0b00010010: return load_r16_mem_a(static_cast<r16>(1));
+                case 0b00100010: return load_hli_mem_a();
+                case 0b00110010: return load_hld_mem_a();
+                // ld a, [r16]
+                case 0b00001010: return load_a_r16_mem(static_cast<r16>(0));
+                case 0b00011010: return load_a_r16_mem(static_cast<r16>(1));
+                case 0b00101010: return load_a_hli_mem();
+                case 0b00111010: return load_a_hld_mem();
+                // ld [n16], sp
+                case 0b00001000: return load_n16_mem_sp();
+                // inc r16
+                case 0b00'00'0011: return inc_r16(static_cast<r16>(0));
+                case 0b00'01'0011: return inc_r16(static_cast<r16>(1));
+                case 0b00'10'0011: return inc_r16(static_cast<r16>(2));
+                case 0b00'11'0011: return inc_r16(static_cast<r16>(3));
+                // dec r16
+                case 0b00'00'1011: return dec_r16(static_cast<r16>(0));
+                case 0b00'01'1011: return dec_r16(static_cast<r16>(1));
+                case 0b00'10'1011: return dec_r16(static_cast<r16>(2));
+                case 0b00'11'1011: return dec_r16(static_cast<r16>(3));
+                // add hl, r16
+                case 0b00'00'1001: return add_hl_r16(static_cast<r16>(0));
+                case 0b00'01'1001: return add_hl_r16(static_cast<r16>(1));
+                case 0b00'10'1001: return add_hl_r16(static_cast<r16>(2));
+                case 0b00'11'1001: return add_hl_r16(static_cast<r16>(3));
+                // inc r8
+                case 0b00'000'100: return inc_r8(static_cast<r8>(0));
+                case 0b00'001'100: return inc_r8(static_cast<r8>(1));
+                case 0b00'010'100: return inc_r8(static_cast<r8>(2));
+                case 0b00'011'100: return inc_r8(static_cast<r8>(3));
+                case 0b00'100'100: return inc_r8(static_cast<r8>(4));
+                case 0b00'101'100: return inc_r8(static_cast<r8>(5));
+                case 0b00'110'100: return inc_hl_mem();
+                case 0b00'111'100: return inc_r8(static_cast<r8>(7));
+                // dec r8
+                case 0b00'000'101: return dec_r8(static_cast<r8>(0));
+                case 0b00'001'101: return dec_r8(static_cast<r8>(1));
+                case 0b00'010'101: return dec_r8(static_cast<r8>(2));
+                case 0b00'011'101: return dec_r8(static_cast<r8>(3));
+                case 0b00'100'101: return dec_r8(static_cast<r8>(4));
+                case 0b00'101'101: return dec_r8(static_cast<r8>(5));
+                case 0b00'110'101: return dec_hl_mem();
+                case 0b00'111'101: return dec_r8(static_cast<r8>(7));
+                // ld r8, n8
+                case 0b00'000'110: return load_r8_n8(static_cast<r8>(0));
+                case 0b00'001'110: return load_r8_n8(static_cast<r8>(1));
+                case 0b00'010'110: return load_r8_n8(static_cast<r8>(2));
+                case 0b00'011'110: return load_r8_n8(static_cast<r8>(3));
+                case 0b00'100'110: return load_r8_n8(static_cast<r8>(4));
+                case 0b00'101'110: return load_r8_n8(static_cast<r8>(5));
+                case 0b00'110'110: return load_hl_n8();
+                case 0b00'111'110: return load_r8_n8(static_cast<r8>(7));
+                // rlca
+                case 0b00'000'111: return rlca();
+                // rrca
+                case 0b00'001'111: return rrca();
+                // rla
+                case 0b00'010'111: return rla();
+                // rra
+                case 0b00'011'111: return rra();
+                // daa
+                case 0b00'100'111: return daa();
+                // cpl
+                case 0b00'101'111: return cpl();
+                // scf
+                case 0b00'110'111: return scf();
+                // ccf
+                case 0b00'111'111: return ccf();
+                // jr n16
+                case 0b00'011'000: return jr_n16();
+                // rr cond, n16
+                case 0b00'100'000: return jr_cc_n16(static_cast<cc>(0));
+                case 0b00'101'000: return jr_cc_n16(static_cast<cc>(1));
+                case 0b00'110'000: return jr_cc_n16(static_cast<cc>(2));
+                case 0b00'111'000: return jr_cc_n16(static_cast<cc>(3));
+                // stop
+                case 0b00'010'000: return stop();
+                // ld r8, r8
+                case 0b01'000'000: return load_r8_r8(static_cast<r8>(0), static_cast<r8>(0));
+                case 0b01'000'001: return load_r8_r8(static_cast<r8>(0), static_cast<r8>(1));
+                case 0b01'000'010: return load_r8_r8(static_cast<r8>(0), static_cast<r8>(2));
+                case 0b01'000'011: return load_r8_r8(static_cast<r8>(0), static_cast<r8>(3));
+                case 0b01'000'100: return load_r8_r8(static_cast<r8>(0), static_cast<r8>(4));
+                case 0b01'000'101: return load_r8_r8(static_cast<r8>(0), static_cast<r8>(5));
+                case 0b01'000'110: return load_r8_hl(static_cast<r8>(0));
+                case 0b01'000'111: return load_r8_r8(static_cast<r8>(0), static_cast<r8>(7));
+                case 0b01'001'000: return load_r8_r8(static_cast<r8>(1), static_cast<r8>(0));
+                case 0b01'001'001: return load_r8_r8(static_cast<r8>(1), static_cast<r8>(1));
+                case 0b01'001'010: return load_r8_r8(static_cast<r8>(1), static_cast<r8>(2));
+                case 0b01'001'011: return load_r8_r8(static_cast<r8>(1), static_cast<r8>(3));
+                case 0b01'001'100: return load_r8_r8(static_cast<r8>(1), static_cast<r8>(4));
+                case 0b01'001'101: return load_r8_r8(static_cast<r8>(1), static_cast<r8>(5));
+                case 0b01'001'110: return load_r8_hl(static_cast<r8>(1));
+                case 0b01'001'111: return load_r8_r8(static_cast<r8>(1), static_cast<r8>(7));
+                case 0b01'010'000: return load_r8_r8(static_cast<r8>(2), static_cast<r8>(0));
+                case 0b01'010'001: return load_r8_r8(static_cast<r8>(2), static_cast<r8>(1));
+                case 0b01'010'010: return load_r8_r8(static_cast<r8>(2), static_cast<r8>(2));
+                case 0b01'010'011: return load_r8_r8(static_cast<r8>(2), static_cast<r8>(3));
+                case 0b01'010'100: return load_r8_r8(static_cast<r8>(2), static_cast<r8>(4));
+                case 0b01'010'101: return load_r8_r8(static_cast<r8>(2), static_cast<r8>(5));
+                case 0b01'010'110: return load_r8_hl(static_cast<r8>(2));
+                case 0b01'010'111: return load_r8_r8(static_cast<r8>(2), static_cast<r8>(7));
+                case 0b01'011'000: return load_r8_r8(static_cast<r8>(3), static_cast<r8>(0));
+                case 0b01'011'001: return load_r8_r8(static_cast<r8>(3), static_cast<r8>(1));
+                case 0b01'011'010: return load_r8_r8(static_cast<r8>(3), static_cast<r8>(2));
+                case 0b01'011'011: return load_r8_r8(static_cast<r8>(3), static_cast<r8>(3));
+                case 0b01'011'100: return load_r8_r8(static_cast<r8>(3), static_cast<r8>(4));
+                case 0b01'011'101: return load_r8_r8(static_cast<r8>(3), static_cast<r8>(5));
+                case 0b01'011'110: return load_r8_hl(static_cast<r8>(3));
+                case 0b01'011'111: return load_r8_r8(static_cast<r8>(3), static_cast<r8>(7));
+                case 0b01'100'000: return load_r8_r8(static_cast<r8>(4), static_cast<r8>(0));
+                case 0b01'100'001: return load_r8_r8(static_cast<r8>(4), static_cast<r8>(1));
+                case 0b01'100'010: return load_r8_r8(static_cast<r8>(4), static_cast<r8>(2));
+                case 0b01'100'011: return load_r8_r8(static_cast<r8>(4), static_cast<r8>(3));
+                case 0b01'100'100: return load_r8_r8(static_cast<r8>(4), static_cast<r8>(4));
+                case 0b01'100'101: return load_r8_r8(static_cast<r8>(4), static_cast<r8>(5));
+                case 0b01'100'110: return load_r8_hl(static_cast<r8>(4));
+                case 0b01'100'111: return load_r8_r8(static_cast<r8>(4), static_cast<r8>(7));
+                case 0b01'101'000: return load_r8_r8(static_cast<r8>(5), static_cast<r8>(0));
+                case 0b01'101'001: return load_r8_r8(static_cast<r8>(5), static_cast<r8>(1));
+                case 0b01'101'010: return load_r8_r8(static_cast<r8>(5), static_cast<r8>(2));
+                case 0b01'101'011: return load_r8_r8(static_cast<r8>(5), static_cast<r8>(3));
+                case 0b01'101'100: return load_r8_r8(static_cast<r8>(5), static_cast<r8>(4));
+                case 0b01'101'101: return load_r8_r8(static_cast<r8>(5), static_cast<r8>(5));
+                case 0b01'101'110: return load_r8_hl(static_cast<r8>(5));
+                case 0b01'101'111: return load_r8_r8(static_cast<r8>(5), static_cast<r8>(7));
+                case 0b01'110'000: return load_hl_r8(static_cast<r8>(0));
+                case 0b01'110'001: return load_hl_r8(static_cast<r8>(1));
+                case 0b01'110'010: return load_hl_r8(static_cast<r8>(2));
+                case 0b01'110'011: return load_hl_r8(static_cast<r8>(3));
+                case 0b01'110'100: return load_hl_r8(static_cast<r8>(4));
+                case 0b01'110'101: return load_hl_r8(static_cast<r8>(5));
+                case 0b01'110'110: return halt();
+                case 0b01'110'111: return load_hl_r8(static_cast<r8>(7));
+                case 0b01'111'000: return load_r8_r8(static_cast<r8>(7), static_cast<r8>(0));
+                case 0b01'111'001: return load_r8_r8(static_cast<r8>(7), static_cast<r8>(1));
+                case 0b01'111'010: return load_r8_r8(static_cast<r8>(7), static_cast<r8>(2));
+                case 0b01'111'011: return load_r8_r8(static_cast<r8>(7), static_cast<r8>(3));
+                case 0b01'111'100: return load_r8_r8(static_cast<r8>(7), static_cast<r8>(4));
+                case 0b01'111'101: return load_r8_r8(static_cast<r8>(7), static_cast<r8>(5));
+                case 0b01'111'110: return load_r8_hl(static_cast<r8>(7));
+                case 0b01'111'111: return load_r8_r8(static_cast<r8>(7), static_cast<r8>(7));
+                // add a, r8
+                case 0b10'000'000: return add_a_r8(static_cast<r8>(0));
+                case 0b10'000'001: return add_a_r8(static_cast<r8>(1));
+                case 0b10'000'010: return add_a_r8(static_cast<r8>(2));
+                case 0b10'000'011: return add_a_r8(static_cast<r8>(3));
+                case 0b10'000'100: return add_a_r8(static_cast<r8>(4));
+                case 0b10'000'101: return add_a_r8(static_cast<r8>(5));
+                case 0b10'000'110: return add_a_hl_mem();
+                case 0b10'000'111: return add_a_r8(static_cast<r8>(7));
+                // adc a, r8
+                case 0b10'001'000: return adc_a_r8(static_cast<r8>(0));
+                case 0b10'001'001: return adc_a_r8(static_cast<r8>(1));
+                case 0b10'001'010: return adc_a_r8(static_cast<r8>(2));
+                case 0b10'001'011: return adc_a_r8(static_cast<r8>(3));
+                case 0b10'001'100: return adc_a_r8(static_cast<r8>(4));
+                case 0b10'001'101: return adc_a_r8(static_cast<r8>(5));
+                case 0b10'001'110: return adc_a_hl_mem();
+                case 0b10'001'111: return adc_a_r8(static_cast<r8>(7));
+                // sub a, r8
+                case 0b10'010'000: return sub_a_r8(static_cast<r8>(0));
+                case 0b10'010'001: return sub_a_r8(static_cast<r8>(1));
+                case 0b10'010'010: return sub_a_r8(static_cast<r8>(2));
+                case 0b10'010'011: return sub_a_r8(static_cast<r8>(3));
+                case 0b10'010'100: return sub_a_r8(static_cast<r8>(4));
+                case 0b10'010'101: return sub_a_r8(static_cast<r8>(5));
+                case 0b10'010'110: return sub_a_hl_mem();
+                case 0b10'010'111: return sub_a_r8(static_cast<r8>(7));
+                // sbc a, r8
+                case 0b10'011'000: return sbc_a_r8(static_cast<r8>(0));
+                case 0b10'011'001: return sbc_a_r8(static_cast<r8>(1));
+                case 0b10'011'010: return sbc_a_r8(static_cast<r8>(2));
+                case 0b10'011'011: return sbc_a_r8(static_cast<r8>(3));
+                case 0b10'011'100: return sbc_a_r8(static_cast<r8>(4));
+                case 0b10'011'101: return sbc_a_r8(static_cast<r8>(5));
+                case 0b10'011'110: return sbc_a_hl_mem();
+                case 0b10'011'111: return sbc_a_r8(static_cast<r8>(7));
+                // and a, r8
+                case 0b10'100'000: return and_a_r8(static_cast<r8>(0));
+                case 0b10'100'001: return and_a_r8(static_cast<r8>(1));
+                case 0b10'100'010: return and_a_r8(static_cast<r8>(2));
+                case 0b10'100'011: return and_a_r8(static_cast<r8>(3));
+                case 0b10'100'100: return and_a_r8(static_cast<r8>(4));
+                case 0b10'100'101: return and_a_r8(static_cast<r8>(5));
+                case 0b10'100'110: return and_a_hl_mem();
+                case 0b10'100'111: return and_a_r8(static_cast<r8>(7));
+                // or a, r8
+                case 0b10'101'000: return xor_a_r8(static_cast<r8>(0));
+                case 0b10'101'001: return xor_a_r8(static_cast<r8>(1));
+                case 0b10'101'010: return xor_a_r8(static_cast<r8>(2));
+                case 0b10'101'011: return xor_a_r8(static_cast<r8>(3));
+                case 0b10'101'100: return xor_a_r8(static_cast<r8>(4));
+                case 0b10'101'101: return xor_a_r8(static_cast<r8>(5));
+                case 0b10'101'110: return xor_a_hl_mem();
+                case 0b10'101'111: return xor_a_r8(static_cast<r8>(7));
+                // or a, r8
+                case 0b10'110'000: return or_a_r8(static_cast<r8>(0));
+                case 0b10'110'001: return or_a_r8(static_cast<r8>(1));
+                case 0b10'110'010: return or_a_r8(static_cast<r8>(2));
+                case 0b10'110'011: return or_a_r8(static_cast<r8>(3));
+                case 0b10'110'100: return or_a_r8(static_cast<r8>(4));
+                case 0b10'110'101: return or_a_r8(static_cast<r8>(5));
+                case 0b10'110'110: return or_a_hl_mem();
+                case 0b10'110'111: return or_a_r8(static_cast<r8>(7));
+                // cp a, r8
+                case 0b10'111'000: return cp_a_r8(static_cast<r8>(0));
+                case 0b10'111'001: return cp_a_r8(static_cast<r8>(1));
+                case 0b10'111'010: return cp_a_r8(static_cast<r8>(2));
+                case 0b10'111'011: return cp_a_r8(static_cast<r8>(3));
+                case 0b10'111'100: return cp_a_r8(static_cast<r8>(4));
+                case 0b10'111'101: return cp_a_r8(static_cast<r8>(5));
+                case 0b10'111'110: return cp_a_hl_mem();
+                case 0b10'111'111: return cp_a_r8(static_cast<r8>(7));
+                // add a, n8
+                case 0b11'000'110: return add_a_n8();
+                // adc a, n8
+                case 0b11'001'110: return adc_a_n8();
+                // sub a, n8
+                case 0b11'010'110: return sub_a_n8();
+                // sbc a, n8
+                case 0b11'011'110: return sbc_a_n8();
+                // and a, n8
+                case 0b11'100'110: return and_a_n8();
+                // xor a, n8
+                case 0b11'101'110: return xor_a_n8();
+                // or a, n8
+                case 0b11'110'110: return or_a_n8();
+                // cp a, n8
+                case 0b11'111'110: return cp_a_n8();
+            }
         }
     };
 }
