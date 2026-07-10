@@ -197,7 +197,7 @@ namespace gb_emulator {
             return val;
         }
 
-        std::uint8_t bus_read_no_tick(std::uint16_t address) {
+        std::uint8_t bus_read_no_tick(std::uint16_t address) const {
             return mem_.read(address);
         }
 
@@ -1008,7 +1008,7 @@ namespace gb_emulator {
         // SET u3,[HL]
         void set_u3_hl_mem(int bit) {
             std::uint8_t data = read8(hl());
-            set_bit(data, bit, true);
+            data = set_bit(data, bit, true);
             write8(hl(), data);
         }
 
@@ -1032,7 +1032,7 @@ namespace gb_emulator {
 
         std::pair<std::uint8_t, bool> rotate_right(std::uint8_t data) {
             std::uint8_t rotated = (data >> 1) | (data << 7);
-            bool new_bit = (data << 7) != 0;
+            bool new_bit = static_cast<std::uint8_t>(data << 7) != 0;
             return std::make_pair(rotated, new_bit);
         }
 
@@ -1624,7 +1624,8 @@ namespace gb_emulator {
 
         // STOP
         void stop() {
-            fetch8();
+            tick(8);
+            // fetch8();
         }
 
         std::uint8_t daa_set_flags(std::uint8_t a_data, bool carry_flag) {

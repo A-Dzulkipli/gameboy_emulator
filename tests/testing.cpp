@@ -1,9 +1,17 @@
 #include <cstdint>
+#include <vector>
+#include <filesystem>
+#include <fstream>
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #define private public
 #include "doctest.h"
 #include "../src/CPU.h"
+
 #undef private
+#include "json.hpp"
+
+using json = nlohmann::json;
+namespace fs = std::filesystem;
 
 using namespace gb_emulator;
 
@@ -1408,11 +1416,11 @@ TEST_CASE("DI / EI / HALT / STOP") {
         CHECK(fx.cpu.halted_ == false);
         CHECK(fx.cpu.halt_bug_ == true);
     }
-    SUBCASE("STOP consumes extra byte") {
-        fx.cpu.pc(0x1000);
-        fx.cpu.stop();
-        CHECK(fx.cpu.pc() == 0x1001);
-    }
+    // SUBCASE("STOP consumes extra byte") {
+    //     fx.cpu.pc(0x1000);
+    //     fx.cpu.stop();
+    //     CHECK(fx.cpu.pc() == 0x1001);
+    // }
 }
 
 TEST_CASE("op_code_decoder dispatch smoke tests") {
@@ -1443,5 +1451,118 @@ TEST_CASE("op_code_decoder dispatch smoke tests") {
         fx.cpu.op_code_decoder(0xFE); // 0xFE is CP A,n8
         CHECK(fx.cpu.flag_z() == true);
         CHECK(fx.cpu.pc() == 0x1001); // PC should advance by 1 byte
+    }
+}
+
+void setup_cpu_test_no_cycles(CPUTest& fx, const json& j) {
+    fx.cpu.pc(j["initial"]["pc"].get<int>());
+    fx.cpu.sp(j["initial"]["sp"].get<int>());
+    fx.cpu.a(j["initial"]["a"].get<int>());
+    fx.cpu.b(j["initial"]["b"].get<int>());
+    fx.cpu.c(j["initial"]["c"].get<int>());
+    fx.cpu.d(j["initial"]["d"].get<int>());
+    fx.cpu.e(j["initial"]["e"].get<int>());
+    fx.cpu.f(j["initial"]["f"].get<int>());
+    fx.cpu.h(j["initial"]["h"].get<int>());
+    fx.cpu.l(j["initial"]["l"].get<int>());
+    // fx.cpu.IME(j["initial"]["ime"].get<int>());
+    // std::vector<std::vector<int>> ram = j["ram"].get<std::vector<std::vector<int>>>();
+    for (const auto& pair : j["initial"]["ram"]) {
+        fx.cpu.bus_write_no_tick(pair[0], pair[1]);
+    }
+}
+
+// void compare_against_final_no_cycles(const CPUTest& fx, const json& j) {
+//     CHECK_MESSAGE(fx.cpu.pc() == j["final"]["pc"], "pc");
+//     CHECK_MESSAGE(fx.cpu.sp() == j["final"]["sp"], "pc");
+//     CHECK_MESSAGE(fx.cpu.a() == j["final"]["a"], "pc");
+//     CHECK_MESSAGE(fx.cpu.b() == j["final"]["b"], "pc");
+//     CHECK_MESSAGE(fx.cpu.c() == j["final"]["c"], "pc");
+//     CHECK_MESSAGE(fx.cpu.d() == j["final"]["d"], "pc");
+//     CHECK_MESSAGE(fx.cpu.e() == j["final"]["e"], "pc");
+//     CHECK_MESSAGE(fx.cpu.f() == j["final"]["f"], "pc");
+//     CHECK_MESSAGE(fx.cpu.h() == j["final"]["h"], "pc");
+//     CHECK_MESSAGE(fx.cpu.l() == j["final"]["l"], "pc");
+//     for (const auto& pair : j["final"]["ram"]) {
+//         CHECK_MESSAGE(fx.cpu.bus_read_no_tick(pair[0]) == pair[1], std::string("ram address: " + to_string(pair[0])));
+//     }
+// }
+
+bool compare_against_final_no_cycles(const CPUTest& fx, const json& j) {
+    bool pass = true;
+    CHECK_MESSAGE(fx.cpu.pc() == j["final"]["pc"], "pc");
+    pass &= fx.cpu.pc() == j["final"]["pc"];
+    CHECK_MESSAGE(fx.cpu.sp() == j["final"]["sp"], "pc");
+    pass &= fx.cpu.sp() == j["final"]["sp"];
+    CHECK_MESSAGE(fx.cpu.a() == j["final"]["a"], "pc");
+    pass &= fx.cpu.a() == j["final"]["a"];
+    CHECK_MESSAGE(fx.cpu.b() == j["final"]["b"], "pc");
+    pass &= fx.cpu.b() == j["final"]["b"];
+    CHECK_MESSAGE(fx.cpu.c() == j["final"]["c"], "pc");
+    pass &= fx.cpu.c() == j["final"]["c"];
+    CHECK_MESSAGE(fx.cpu.d() == j["final"]["d"], "pc");
+    pass &= fx.cpu.d() == j["final"]["d"];
+    CHECK_MESSAGE(fx.cpu.e() == j["final"]["e"], "pc");
+    pass &= fx.cpu.e() == j["final"]["e"];
+    CHECK_MESSAGE(fx.cpu.f() == j["final"]["f"], "pc");
+    pass &= fx.cpu.f() == j["final"]["f"];
+    CHECK_MESSAGE(fx.cpu.h() == j["final"]["h"], "pc");
+    pass &= fx.cpu.h() == j["final"]["h"];
+    CHECK_MESSAGE(fx.cpu.l() == j["final"]["l"], "pc");
+    pass &= fx.cpu.l() == j["final"]["l"];
+    for (const auto& pair : j["final"]["ram"]) {
+        CHECK_MESSAGE(fx.cpu.bus_read_no_tick(pair[0]) == pair[1], std::string("ram address: " + to_string(pair[0])));
+        pass &= fx.cpu.bus_read_no_tick(pair[0]) == pair[1];
+    }
+    return pass;
+}
+
+// TEST_CASE("SM83 Tests") {
+//     std::string test_path = "./sm83/v1";
+//     fs::path test_iter = fs::path(test_path);
+//     // std::vector<std::string> tests;
+//     for (const auto& test : fs::directory_iterator(test_iter)) {
+//         // tests.push_back(test.path().string());
+//         json j_test;
+//         std::ifstream json_test(test.path().string());
+//         json_test >> j_test;
+//         CPUTest fx;
+//         setup_cpu_test_no_cycles(fx, j_test);
+//         fx.cpu.step();
+//         compare_against_final_no_cycles(fx, j_test);
+//     }
+// }
+
+TEST_CASE("SM83 Tests") {
+    std::string test_path = "./sm83/v1";
+    fs::path test_iter = fs::path(test_path);
+
+    // int i = 0;
+
+    for (const auto& test_file : fs::directory_iterator(test_iter)) {
+        // if (test_file.path().string() != "./sm83/v1/00.json") continue;
+        // i++;
+        json j_test_array;
+        std::ifstream json_file(test_file.path().string());
+        json_file >> j_test_array;
+
+        int i = 0;
+        bool fail = false;
+
+        // Iterate over each test object within the array
+        for (const auto& test_case : j_test_array) {
+            i++;
+            INFO("Instruction Test Name: ", test_case["name"].get<std::string>());
+            CPUTest fx;
+            setup_cpu_test_no_cycles(fx, test_case);
+            fx.cpu.step();
+            if (!compare_against_final_no_cycles(fx, test_case)) {
+                fail = true;
+                break;
+            }
+            if (fail) break;
+            // if (i == 4) break;
+        }
+        if (fail) break;
     }
 }
