@@ -156,14 +156,14 @@ TEST_CASE("LD r8,n8 - load_r8_n8") {
         CPUTest fx;
         CHECK(fx.cpu.read_r8(dest) == 0);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
-        fx.cpu.write8(fx.cpu.pc(), 1);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), 1);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 1);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 1);
         fx.cpu.load_r8_n8(dest);
         CHECK(fx.cpu.pc() == 1);
-        CHECK(fx.cpu.read8(fx.cpu.pc() - 1) == 1);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc() - 1) == 1);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
         CHECK(fx.cpu.read_r8(dest) == 1);
     }
 }
@@ -175,14 +175,14 @@ TEST_CASE("LD r8,n8 - load_r8_n8, val > 255") {
         int val = 255;
         CHECK(fx.cpu.read_r8(dest) == 0);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
-        fx.cpu.write8(fx.cpu.pc(), val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), val);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == val);
         fx.cpu.load_r8_n8(dest);
         CHECK(fx.cpu.pc() == 1);
-        CHECK(fx.cpu.read8(fx.cpu.pc() - 1) == val);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc() - 1) == val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
         CHECK(fx.cpu.read_r8(dest) == val);
     }
 
@@ -192,14 +192,14 @@ TEST_CASE("LD r8,n8 - load_r8_n8, val > 255") {
         int val = 256;
         CHECK(fx.cpu.read_r8(dest) == 0);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
-        fx.cpu.write8(fx.cpu.pc(), val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), val & 0xFF);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
         fx.cpu.load_r8_n8(dest);
         CHECK(fx.cpu.pc() == 1);
-        CHECK(fx.cpu.read8(fx.cpu.pc() - 1) == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc() - 1) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
         CHECK(fx.cpu.read_r8(dest) == 0);
     }
 }
@@ -211,16 +211,17 @@ TEST_CASE("LD r16,n16 load_r16_n16") {
         int val = 255;
         CHECK(fx.cpu.read_r16(dest) == 0);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
-        fx.cpu.write16(fx.cpu.pc(), val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), val & 0xFF);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc() + 1, val >> 8);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == val);
-        CHECK(fx.cpu.read8(fx.cpu.pc()+1) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()+1) == 0);
         fx.cpu.load_r16_n16(dest);
         CHECK(fx.cpu.pc() == 2);
-        CHECK(fx.cpu.read8(fx.cpu.pc() - 1) == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc() - 2) == val);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc() - 1) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc() - 2) == val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
         CHECK(fx.cpu.read_r16(dest) == val);
     }
 
@@ -230,16 +231,17 @@ TEST_CASE("LD r16,n16 load_r16_n16") {
         int val = 256;
         CHECK(fx.cpu.read_r16(dest) == 0);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
-        fx.cpu.write16(fx.cpu.pc(), val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), val & 0xFF);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc() + 1, val >> 8);
         CHECK(fx.cpu.pc() == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()+1) == 1);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()+1) == 1);
         fx.cpu.load_r16_n16(dest);
         CHECK(fx.cpu.pc() == 2);
-        CHECK(fx.cpu.read8(fx.cpu.pc() - 1) == 1);
-        CHECK(fx.cpu.read8(fx.cpu.pc() - 2) == 0);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc() - 1) == 1);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc() - 2) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == 0);
         CHECK(fx.cpu.read_r16(dest) == 256);
     }
 }
@@ -256,12 +258,12 @@ TEST_CASE("LD [HL],r8 - load_hl_r8") {
             if (source == CPU<SimpleMem, NothingClock>::r8::h ||source == CPU<SimpleMem, NothingClock>::r8::l) continue;
             CPUTest fx;
             std::uint16_t val_lo = 255;
-            CHECK(fx.cpu.read8(address) == 0);
+            CHECK(fx.cpu.bus_read_no_tick(address) == 0);
             fx.cpu.write_r8(source, val_lo);
             CHECK(fx.cpu.read_r8(source) == val_lo);
             fx.cpu.hl(address);
             fx.cpu.load_hl_r8(source);
-            CHECK(fx.cpu.read8(address) == val_lo);
+            CHECK(fx.cpu.bus_read_no_tick(address) == val_lo);
             CHECK(fx.cpu.hl() == address);
         }
     }
@@ -272,12 +274,12 @@ TEST_CASE("LD [HL],r8 - load_hl_r8") {
             CPUTest fx;
             std::uint16_t val = 256;
             std::uint16_t val_expected = 0;
-            CHECK(fx.cpu.read8(address) == 0);
+            CHECK(fx.cpu.bus_read_no_tick(address) == 0);
             fx.cpu.write_r8(source, val);
             CHECK(fx.cpu.read_r8(source) == val_expected);
             fx.cpu.hl(address);
             fx.cpu.load_hl_r8(source);
-            CHECK(fx.cpu.read8(address) == val_expected);
+            CHECK(fx.cpu.bus_read_no_tick(address) == val_expected);
             CHECK(fx.cpu.hl() == address);
         }
     }
@@ -295,15 +297,15 @@ TEST_CASE("LD [HL],n8 - load_hl_n8") {
         CPUTest fx;
         std::uint8_t val = 255;
         CHECK(fx.cpu.pc() == 0);
-        fx.cpu.write8(fx.cpu.pc(), val);
-        CHECK(fx.cpu.read8(fx.cpu.pc()) == val);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), val);
+        CHECK(fx.cpu.bus_read_no_tick(fx.cpu.pc()) == val);
         CHECK(fx.cpu.pc() == 0);
         fx.cpu.hl(address);
-        CHECK(fx.cpu.read8(address) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(address) == 0);
         CHECK(fx.cpu.hl() == address);
         fx.cpu.load_hl_n8();
         CHECK(fx.cpu.hl() == address);
-        CHECK(fx.cpu.read8(address) == val);
+        CHECK(fx.cpu.bus_read_no_tick(address) == val);
     }
 }
 
@@ -321,27 +323,27 @@ TEST_CASE("LD r8,[HL] - load_r8_hl") {
             CPUTest fx;
             std::uint8_t val = 255;
             // initial state
-            CHECK(fx.cpu.read8(address) == 0);
+            CHECK(fx.cpu.bus_read_no_tick(address) == 0);
             CHECK(fx.cpu.read_r8(reg) == 0);
             CHECK(fx.cpu.hl() == 0);
-            fx.cpu.write8(address, val);
+            fx.cpu.bus_write_no_tick(address, val);
             fx.cpu.hl(address);
             // val loaded into address
             // address loaded into hl
             // register still 0
-            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.bus_read_no_tick(address) == val);
             CHECK(fx.cpu.hl() == address);
             CHECK(fx.cpu.read_r8(reg) == 0);
             fx.cpu.load_r8_hl(reg);
             // [address] still val
             // hl still address
             // register now val
-            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.bus_read_no_tick(address) == val);
             CHECK(fx.cpu.hl() == address);
             CHECK(fx.cpu.read_r8(reg) == val);
             fx.cpu.load_r8_hl(reg);
             // idempotence
-            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.bus_read_no_tick(address) == val);
             CHECK(fx.cpu.hl() == address);
             CHECK(fx.cpu.read_r8(reg) == val);
         }
@@ -361,9 +363,9 @@ TEST_CASE("LD [r16],A - load_r16_mem_a") {
             std::uint8_t val = 255;
             fx.cpu.a(val);
             fx.cpu.write_r16(reg, address);
-            CHECK(fx.cpu.read8(address) == 0);
+            CHECK(fx.cpu.bus_read_no_tick(address) == 0);
             fx.cpu.load_r16_mem_a(reg);
-            CHECK(fx.cpu.read8(address) == val);
+            CHECK(fx.cpu.bus_read_no_tick(address) == val);
             CHECK(fx.cpu.a() == val);
             CHECK(fx.cpu.read_r16(reg) == address);
         }
@@ -380,11 +382,12 @@ TEST_CASE("LD [n16],A - load_n16_mem_a") {
     for (const auto address : mems) {
         CPUTest fx;
         std::uint8_t val = 255;
-        fx.cpu.write16(fx.cpu.pc(), address);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), address & 0xFF);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc() + 1, address >> 8);
         fx.cpu.a(val);
-        CHECK(fx.cpu.read8(address) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(address) == 0);
         fx.cpu.load_n16_mem_a();
-        CHECK(fx.cpu.read8(address) == val);
+        CHECK(fx.cpu.bus_read_no_tick(address) == val);
     }
 }
 
@@ -398,11 +401,11 @@ TEST_CASE("LDH [n16],A - loadh_n16_mem_a") {
     for (const auto address : mems) {
         CPUTest fx;
         std::uint8_t val = 255;
-        fx.cpu.write8(fx.cpu.pc(), address);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), address);
         fx.cpu.a(val);
-        CHECK(fx.cpu.read8(static_cast<std::uint16_t>(address) | 0xFF00) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(static_cast<std::uint16_t>(address) | 0xFF00) == 0);
         fx.cpu.loadh_n16_mem_a();
-        CHECK(fx.cpu.read8(static_cast<std::uint16_t>(address) | 0xFF00) == val);
+        CHECK(fx.cpu.bus_read_no_tick(static_cast<std::uint16_t>(address) | 0xFF00) == val);
     }
 }
 
@@ -418,9 +421,9 @@ TEST_CASE("LDH [C],A - loadh_c_mem_a") {
         std::uint8_t val = 255;
         fx.cpu.c(address);
         fx.cpu.a(val);
-        CHECK(fx.cpu.read8(static_cast<std::uint16_t>(address) | 0xFF00) == 0);
+        CHECK(fx.cpu.bus_read_no_tick(static_cast<std::uint16_t>(address) | 0xFF00) == 0);
         fx.cpu.loadh_c_mem_a();
-        CHECK(fx.cpu.read8(static_cast<std::uint16_t>(address) | 0xFF00) == val);
+        CHECK(fx.cpu.bus_read_no_tick(static_cast<std::uint16_t>(address) | 0xFF00) == val);
     }
 }
 
@@ -437,7 +440,7 @@ TEST_CASE("LD A,[r16] - load_a_r16_mem") {
             CPUTest fx;
             std::uint8_t val = 255;
             fx.cpu.write_r16(reg, address);
-            fx.cpu.write16(address, val);
+            fx.cpu.bus_write_no_tick(address, val);
             CHECK(fx.cpu.a() == 0);
             fx.cpu.load_a_r16_mem(reg);
             CHECK(fx.cpu.a() == val);
@@ -455,8 +458,9 @@ TEST_CASE("LD A,[n16] - load_a_n16_mem") {
     for (const auto address : mems) {
         CPUTest fx;
         std::uint8_t val = 255;
-        fx.cpu.write16(fx.cpu.pc(), address);
-        fx.cpu.write8(address, val);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), address & 0xFF);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc() + 1, address >> 8);
+        fx.cpu.bus_write_no_tick(address, val);
         CHECK(fx.cpu.a() == 0);
         fx.cpu.load_a_n16_mem();
         CHECK(fx.cpu.a() == val);
@@ -473,8 +477,8 @@ TEST_CASE("LDH A,[n16] - loadh_a_n16_mem") {
     for (const auto address : mems) {
         CPUTest fx;
         std::uint8_t val = 255;
-        fx.cpu.write8(fx.cpu.pc(), address);
-        fx.cpu.write8(static_cast<std::uint16_t>(address) | 0xFF00, val);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), address);
+        fx.cpu.bus_write_no_tick(static_cast<std::uint16_t>(address) | 0xFF00, val);
         CHECK(fx.cpu.a() == 0);
         fx.cpu.loadh_a_n16_mem();
         CHECK(fx.cpu.a() == val);
@@ -780,7 +784,7 @@ TEST_CASE("ADD SP,e8 - flags from unsigned low byte, Z=N=0") {
     CPUTest fx;
     SUBCASE("positive offset, half-carry") {
         fx.cpu.sp(0x000F);
-        fx.cpu.write8(fx.cpu.pc(), 0x01);  // e8 = +1
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x01);  // e8 = +1
         fx.cpu.add_sp_e8();
         CHECK(fx.cpu.sp() == 0x0010);
         CHECK(fx.cpu.flag_h() == true);    // low nibble 0xF+1
@@ -789,7 +793,7 @@ TEST_CASE("ADD SP,e8 - flags from unsigned low byte, Z=N=0") {
     }
     SUBCASE("carry from low byte") {
         fx.cpu.sp(0x00FF);
-        fx.cpu.write8(fx.cpu.pc(), 0x01);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x01);
         fx.cpu.add_sp_e8();
         CHECK(fx.cpu.sp() == 0x0100);
         CHECK(fx.cpu.flag_c() == true);
@@ -797,7 +801,7 @@ TEST_CASE("ADD SP,e8 - flags from unsigned low byte, Z=N=0") {
     }
     SUBCASE("negative offset subtracts from SP") {
         fx.cpu.sp(0x0100);
-        fx.cpu.write8(fx.cpu.pc(), 0xFF);  // e8 = -1
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0xFF);  // e8 = -1
         fx.cpu.add_sp_e8();
         CHECK(fx.cpu.sp() == 0x00FF);
         // flags computed from unsigned 0xFF + low byte 0x00
@@ -808,7 +812,7 @@ TEST_CASE("ADD SP,e8 - flags from unsigned low byte, Z=N=0") {
 TEST_CASE("LD HL,SP+e8 - same flags, writes HL, SP unchanged") {
     CPUTest fx;
     fx.cpu.sp(0x000F);
-    fx.cpu.write8(fx.cpu.pc(), 0x01);
+    fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x01);
     fx.cpu.load_hl_sp_e8();
     CHECK(fx.cpu.hl() == 0x0010);
     CHECK(fx.cpu.sp() == 0x000F);      // SP untouched
@@ -830,10 +834,11 @@ TEST_CASE("LD SP,HL") {
 TEST_CASE("LD [n16],SP - stores SP little-endian") {
     CPUTest fx;
     fx.cpu.sp(0x1234);
-    fx.cpu.write16(fx.cpu.pc(), 0xC000);  // address operand
+    fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x00);
+    fx.cpu.bus_write_no_tick(fx.cpu.pc() + 1, 0xC0);  // address operand 0xC000
     fx.cpu.load_n16_mem_sp();
-    CHECK(fx.cpu.read8(0xC000) == 0x34);  // low
-    CHECK(fx.cpu.read8(0xC001) == 0x12);  // high
+    CHECK(fx.cpu.bus_read_no_tick(0xC000) == 0x34);  // low
+    CHECK(fx.cpu.bus_read_no_tick(0xC001) == 0x12);  // high
 }
 
 // ============ Stack: PUSH / POP ============
@@ -861,8 +866,8 @@ TEST_CASE("PUSH stack byte order - high at higher address") {
     fx.cpu.bc(0x1234);
     fx.cpu.push_r16(CPU<SimpleMem,NothingClock>::r16::bc);
     // after push: SP=0xFFFC, low byte at SP, high byte at SP+1
-    CHECK(fx.cpu.read8(0xFFFC) == 0x34);  // low
-    CHECK(fx.cpu.read8(0xFFFD) == 0x12);  // high
+    CHECK(fx.cpu.bus_read_no_tick(0xFFFC) == 0x34);  // low
+    CHECK(fx.cpu.bus_read_no_tick(0xFFFD) == 0x12);  // high
 }
 
 TEST_CASE("PUSH/POP AF - F low nibble masked") {
@@ -880,8 +885,8 @@ TEST_CASE("PUSH/POP AF - F low nibble masked") {
 TEST_CASE("POP AF cannot set F low nibble") {
     CPUTest fx;
     fx.cpu.sp(0xFFFC);
-    fx.cpu.write8(0xFFFC, 0xFF);  // low byte (F) = 0xFF
-    fx.cpu.write8(0xFFFD, 0x12);  // high byte (A)
+    fx.cpu.bus_write_no_tick(0xFFFC, 0xFF);  // low byte (F) = 0xFF
+    fx.cpu.bus_write_no_tick(0xFFFD, 0x12);  // high byte (A)
     fx.cpu.pop_af();
     CHECK(fx.cpu.a() == 0x12);
     CHECK(fx.cpu.f() == 0xF0);    // low nibble of F forced zero
@@ -1085,17 +1090,17 @@ TEST_CASE("SET u3,r8 - sets bit, no flags") {
     CPUTest fx;
     fx.cpu.f(0x00);
     fx.cpu.b(0x00);
-    // NOTE: set_u3_r8 exists? check header — appears absent
-    // fx.cpu.set_u3_r8(3, CPU<SimpleMem,NothingClock>::r8::b);
-    // CHECK(fx.cpu.b() == 0x08);
-    // CHECK(fx.cpu.f() == 0x00);
+    fx.cpu.set_u3_r8(3, CPU<SimpleMem,NothingClock>::r8::b);
+    CHECK(fx.cpu.b() == 0x08);
+    CHECK(fx.cpu.f() == 0x00);
 }
 
 // ============ Control flow: JP / CALL ============
 
 TEST_CASE("JP n16 - unconditional jump") {
     CPUTest fx;
-    fx.cpu.write16(fx.cpu.pc(), 0xC000);
+    fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x00);
+    fx.cpu.bus_write_no_tick(fx.cpu.pc() + 1, 0xC0);
     fx.cpu.jp_n16();
     CHECK(fx.cpu.pc() == 0xC000);
 }
@@ -1112,14 +1117,16 @@ TEST_CASE("JP cc,n16 - conditional") {
     SUBCASE("taken when condition true") {
         fx.cpu.f(0x80);  // Z set
         fx.cpu.pc(0x0000);
-        fx.cpu.write16(0x0000, 0xC000);
+        fx.cpu.bus_write_no_tick(0x0000, 0x00);
+        fx.cpu.bus_write_no_tick(0x0001, 0xC0);
         fx.cpu.jp_cc_n16(CPU<SimpleMem,NothingClock>::cc::z);
         CHECK(fx.cpu.pc() == 0xC000);
     }
     SUBCASE("not taken when condition false, PC past operand") {
         fx.cpu.f(0x00);  // Z clear
         fx.cpu.pc(0x0000);
-        fx.cpu.write16(0x0000, 0xC000);
+        fx.cpu.bus_write_no_tick(0x0000, 0x00);
+        fx.cpu.bus_write_no_tick(0x0001, 0xC0);
         fx.cpu.jp_cc_n16(CPU<SimpleMem,NothingClock>::cc::z);
         CHECK(fx.cpu.pc() == 0x0002);   // advanced past the 2 address bytes
     }
@@ -1129,20 +1136,22 @@ TEST_CASE("CALL n16 - pushes return address, jumps") {
     CPUTest fx;
     fx.cpu.sp(0xFFFE);
     fx.cpu.pc(0x0000);
-    fx.cpu.write16(0x0000, 0xC000);   // target
+    fx.cpu.bus_write_no_tick(0x0000, 0x00);   // target
+    fx.cpu.bus_write_no_tick(0x0001, 0xC0);
     fx.cpu.call_n16();
     CHECK(fx.cpu.pc() == 0xC000);      // jumped
     CHECK(fx.cpu.sp() == 0xFFFC);      // SP decremented
     // return address = 0x0002 (after the 2 operand bytes)
-    CHECK(fx.cpu.read8(0xFFFC) == 0x02);  // low
-    CHECK(fx.cpu.read8(0xFFFD) == 0x00);  // high
+    CHECK(fx.cpu.bus_read_no_tick(0xFFFC) == 0x02);  // low
+    CHECK(fx.cpu.bus_read_no_tick(0xFFFD) == 0x00);  // high
 }
 
 TEST_CASE("CALL then simulated RET restores PC") {
     CPUTest fx;
     fx.cpu.sp(0xFFFE);
     fx.cpu.pc(0x0000);
-    fx.cpu.write16(0x0000, 0xC000);
+    fx.cpu.bus_write_no_tick(0x0000, 0x00);
+    fx.cpu.bus_write_no_tick(0x0001, 0xC0);
     fx.cpu.call_n16();
     // pop the return address back
     std::uint16_t ret = fx.cpu.pop16();
@@ -1155,7 +1164,8 @@ TEST_CASE("CALL cc,n16 - conditional") {
         CPUTest fx;
         fx.cpu.sp(0xFFFE);
         fx.cpu.f(0x80);  // Z set
-        fx.cpu.write16(0x0000, 0xC000);
+        fx.cpu.bus_write_no_tick(0x0000, 0x00);
+        fx.cpu.bus_write_no_tick(0x0001, 0xC0);
         fx.cpu.call_cc_n16(CPU<SimpleMem,NothingClock>::cc::z);
         CHECK(fx.cpu.pc() == 0xC000);
         CHECK(fx.cpu.sp() == 0xFFFC);
@@ -1164,7 +1174,8 @@ TEST_CASE("CALL cc,n16 - conditional") {
         CPUTest fx;
         fx.cpu.sp(0xFFFE);
         fx.cpu.f(0x00);  // Z clear
-        fx.cpu.write16(0x0000, 0xC000);
+        fx.cpu.bus_write_no_tick(0x0000, 0x00);
+        fx.cpu.bus_write_no_tick(0x0001, 0xC0);
         fx.cpu.call_cc_n16(CPU<SimpleMem,NothingClock>::cc::z);
         CHECK(fx.cpu.pc() == 0x0002);   // consumed operand, didn't jump
         CHECK(fx.cpu.sp() == 0xFFFE);   // no push
@@ -1183,16 +1194,14 @@ TEST_CASE("cycle counts - representative instructions") {
     }
     SUBCASE("ADD A,n8 = immediate fetch = 4 T-cycles") {
         CPUCycleTest fx;
-        fx.cpu.write8(fx.cpu.pc(), 0x01);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x01);
         fx.cpu.add_a_n8();
         CHECK(fx.clock.cycles == 4);  // one fetch8
     }
     SUBCASE("ADD A,[HL] = one bus read = 4") {
         CPUCycleTest fx;
         fx.cpu.hl(0xC000);
-        fx.cpu.write8(0xC000, 0x01);
-        // reset counter after setup write
-        fx.clock.cycles = 0;
+        fx.cpu.bus_write_no_tick(0xC000, 0x01);
         fx.cpu.add_a_hl_mem();
         CHECK(fx.clock.cycles == 4);
     }
@@ -1204,7 +1213,7 @@ TEST_CASE("cycle counts - representative instructions") {
     }
     SUBCASE("ADD SP,e8 internal cycles = fetch(4) + 8 = 12") {
         CPUCycleTest fx;
-        fx.cpu.write8(fx.cpu.pc(), 0x01);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x01);
         fx.cpu.add_sp_e8();
         CHECK(fx.clock.cycles == 12);  // fetch8 (4) + tick(8)
     }
@@ -1218,8 +1227,221 @@ TEST_CASE("cycle counts - representative instructions") {
     SUBCASE("POP r16 = 2 reads = 8") {
         CPUCycleTest fx;
         fx.cpu.sp(0xFFFC);
-        fx.clock.cycles = 0;
         fx.cpu.pop_r16(CPU<SimpleMem,gb_emulator::CountingClock>::r16::bc);
         CHECK(fx.clock.cycles == 8);
+    }
+}
+
+// ================= NEW TEST COVERAGE =================
+
+TEST_CASE("LD [HLI],A / LD [HLD],A") {
+    CPUTest fx;
+    SUBCASE("LD [HLI],A") {
+        fx.cpu.hl(0xC000);
+        fx.cpu.a(0x42);
+        fx.cpu.load_hli_mem_a();
+        CHECK(fx.cpu.bus_read_no_tick(0xC000) == 0x42);
+        CHECK(fx.cpu.hl() == 0xC001);
+    }
+    SUBCASE("LD [HLD],A") {
+        fx.cpu.hl(0xC000);
+        fx.cpu.a(0x42);
+        fx.cpu.load_hld_mem_a();
+        CHECK(fx.cpu.bus_read_no_tick(0xC000) == 0x42);
+        CHECK(fx.cpu.hl() == 0xBFFF);
+    }
+}
+
+TEST_CASE("LD A,[HLI] / LD A,[HLD]") {
+    CPUTest fx;
+    SUBCASE("LD A,[HLI]") {
+        fx.cpu.hl(0xC000);
+        fx.cpu.bus_write_no_tick(0xC000, 0x42);
+        fx.cpu.load_a_hli_mem();
+        CHECK(fx.cpu.a() == 0x42);
+        CHECK(fx.cpu.hl() == 0xC001);
+    }
+    SUBCASE("LD A,[HLD]") {
+        fx.cpu.hl(0xC000);
+        fx.cpu.bus_write_no_tick(0xC000, 0x42);
+        fx.cpu.load_a_hld_mem();
+        CHECK(fx.cpu.a() == 0x42);
+        CHECK(fx.cpu.hl() == 0xBFFF);
+    }
+}
+
+TEST_CASE("DAA - Decimal Adjust Accumulator") {
+    CPUTest fx;
+    SUBCASE("Addition out of bounds") {
+        fx.cpu.a(0x15);
+        fx.cpu.b(0x27);
+        fx.cpu.add_a_r8(CPU<SimpleMem,NothingClock>::r8::b);
+        fx.cpu.daa();
+        CHECK(fx.cpu.a() == 0x42); // 15 + 27 in BCD
+    }
+    SUBCASE("After subtraction with carry") {
+        fx.cpu.a(0x22);
+        fx.cpu.bus_write_no_tick(fx.cpu.pc(), 0x33);
+        fx.cpu.sub_a_n8();
+        fx.cpu.daa();
+        CHECK(fx.cpu.a() == 0x89);
+        CHECK(fx.cpu.flag_c() == true);
+    }
+}
+
+TEST_CASE("SCF / CCF - Carry Flag Operations") {
+    CPUTest fx;
+    SUBCASE("SCF sets carry, clears N/H") {
+        fx.cpu.f(0x00);
+        fx.cpu.scf();
+        CHECK(fx.cpu.flag_c() == true);
+        CHECK(fx.cpu.flag_n() == false);
+        CHECK(fx.cpu.flag_h() == false);
+    }
+    SUBCASE("CCF flips carry, clears N/H") {
+        fx.cpu.f(0x00);
+        fx.cpu.scf(); // C=1
+        fx.cpu.ccf(); // C=0
+        CHECK(fx.cpu.flag_c() == false);
+        CHECK(fx.cpu.flag_n() == false);
+        CHECK(fx.cpu.flag_h() == false);
+    }
+}
+
+TEST_CASE("JR / JR cc - Relative Jumps") {
+    CPUTest fx;
+    SUBCASE("Unconditional JR jumps correctly via relative signed offset") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.bus_write_no_tick(0x1000, static_cast<std::uint8_t>(-5));
+        fx.cpu.jr_n16();
+        // Read 1 byte -> PC=1001, jumps by -5 -> PC=0xFFC (1001 - 5 = 0x0FFC)
+        CHECK(fx.cpu.pc() == 0x1001 - 5);
+    }
+    SUBCASE("JR cc conditional taken") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.bus_write_no_tick(0x1000, 0x05);
+        fx.cpu.f(0x80); // Z set
+        fx.cpu.jr_cc_n16(CPU<SimpleMem,NothingClock>::cc::z);
+        CHECK(fx.cpu.pc() == 0x1001 + 5);
+    }
+    SUBCASE("JR cc conditional not taken") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.bus_write_no_tick(0x1000, 0x05);
+        fx.cpu.f(0x00); // Z clear
+        fx.cpu.jr_cc_n16(CPU<SimpleMem,NothingClock>::cc::z);
+        CHECK(fx.cpu.pc() == 0x1001); // Only advanced past operand
+    }
+}
+
+TEST_CASE("RET / RET cc / RETI") {
+    CPUTest fx;
+    SUBCASE("Unconditional RET") {
+        fx.cpu.sp(0xFFFC);
+        fx.cpu.bus_write_no_tick(0xFFFC, 0x00);
+        fx.cpu.bus_write_no_tick(0xFFFD, 0xC0);
+        fx.cpu.ret();
+        CHECK(fx.cpu.pc() == 0xC000);
+        CHECK(fx.cpu.sp() == 0xFFFE);
+    }
+    SUBCASE("RET cc taken") {
+        fx.cpu.sp(0xFFFC);
+        fx.cpu.bus_write_no_tick(0xFFFC, 0x00);
+        fx.cpu.bus_write_no_tick(0xFFFD, 0xC0);
+        fx.cpu.f(0x80); // Z set
+        fx.cpu.ret_cc(CPU<SimpleMem,NothingClock>::cc::z);
+        CHECK(fx.cpu.pc() == 0xC000);
+        CHECK(fx.cpu.sp() == 0xFFFE);
+    }
+    SUBCASE("RET cc not taken") {
+        fx.cpu.sp(0xFFFC);
+        fx.cpu.pc(0x1000);
+        fx.cpu.bus_write_no_tick(0xFFFC, 0x00);
+        fx.cpu.bus_write_no_tick(0xFFFD, 0xC0);
+        fx.cpu.f(0x00); // Z clear
+        fx.cpu.ret_cc(CPU<SimpleMem,NothingClock>::cc::z);
+        CHECK(fx.cpu.pc() == 0x1000);
+        CHECK(fx.cpu.sp() == 0xFFFC);
+    }
+    SUBCASE("RETI enables interrupts and returns") {
+        fx.cpu.sp(0xFFFC);
+        fx.cpu.bus_write_no_tick(0xFFFC, 0x00);
+        fx.cpu.bus_write_no_tick(0xFFFD, 0xC0);
+        fx.cpu.IME_ = false;
+        fx.cpu.reti();
+        CHECK(fx.cpu.pc() == 0xC000);
+        CHECK(fx.cpu.sp() == 0xFFFE);
+        CHECK(fx.cpu.IME_ == true);
+    }
+}
+
+TEST_CASE("RST - Restart Vectors") {
+    CPUTest fx;
+    fx.cpu.sp(0xFFFE);
+    fx.cpu.pc(0x1234);
+    fx.cpu.rst_vec(0x38);
+    CHECK(fx.cpu.pc() == 0x0038);
+    CHECK(fx.cpu.bus_read_no_tick(0xFFFC) == 0x34); // Low
+    CHECK(fx.cpu.bus_read_no_tick(0xFFFD) == 0x12); // High
+}
+
+TEST_CASE("DI / EI / HALT / STOP") {
+    CPUTest fx;
+    SUBCASE("EI / DI toggles IME") {
+        fx.cpu.ei();
+        CHECK(fx.cpu.IME_ == true);
+        fx.cpu.di();
+        CHECK(fx.cpu.IME_ == false);
+    }
+    SUBCASE("HALT without pending interrupts halts normally") {
+        fx.cpu.ei();
+        fx.cpu.bus_write_no_tick(0xFFFF, 0x00); // IE
+        fx.cpu.bus_write_no_tick(0xFF0F, 0x00); // IF
+        fx.cpu.halt();
+        CHECK(fx.cpu.halted_ == true);
+        CHECK(fx.cpu.halt_bug_ == false);
+    }
+    SUBCASE("HALT bug triggers with disabled IME and pending interrupts") {
+        fx.cpu.di();
+        fx.cpu.bus_write_no_tick(0xFFFF, 0x01); // IE (VBLANK enabled)
+        fx.cpu.bus_write_no_tick(0xFF0F, 0x01); // IF (VBLANK requested)
+        fx.cpu.halt();
+        CHECK(fx.cpu.halted_ == false);
+        CHECK(fx.cpu.halt_bug_ == true);
+    }
+    SUBCASE("STOP consumes extra byte") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.stop();
+        CHECK(fx.cpu.pc() == 0x1001);
+    }
+}
+
+TEST_CASE("op_code_decoder dispatch smoke tests") {
+    CPUTest fx;
+    SUBCASE("NOP") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.op_code_decoder(0x00);
+        CHECK(fx.cpu.pc() == 0x1000); // No fetch occurs internally
+    }
+    SUBCASE("LD B,D") {
+        fx.cpu.b(0);
+        fx.cpu.d(0x42);
+        fx.cpu.op_code_decoder(0b01'000'010); // 0x42
+        CHECK(fx.cpu.b() == 0x42);
+    }
+    SUBCASE("LD A,n8") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.bus_write_no_tick(0x1000, 0x99);
+        fx.cpu.a(0x00);
+        fx.cpu.op_code_decoder(0b00'111'110); // 0x3E is LD A,n8
+        CHECK(fx.cpu.a() == 0x99);
+        CHECK(fx.cpu.pc() == 0x1001); // PC should advance by 1 byte
+    }
+    SUBCASE("CP A,n8") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.bus_write_no_tick(0x1000, 0x99);
+        fx.cpu.a(0x99);
+        fx.cpu.op_code_decoder(0xFE); // 0xFE is CP A,n8
+        CHECK(fx.cpu.flag_z() == true);
+        CHECK(fx.cpu.pc() == 0x1001); // PC should advance by 1 byte
     }
 }

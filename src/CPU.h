@@ -47,6 +47,46 @@ namespace gb_emulator {
     template <typename Memory, typename Clock>
     class CPU {
     public:
+        // primary interface - step function
+        void step() {
+            if (interrupt()) {
+                IME(false);
+                InterruptBit interrupt = get_smallest_valid_interrupt();
+                interrupt_f_no_tick(false, interrupt);
+                nop();
+                nop();
+                push16(pc());
+                switch (interrupt) {
+                    case InterruptBit::vblank: {
+                        pc(vblank_);
+                        break;
+                    }
+                    case InterruptBit::lcd: {
+                        pc(lcd_);
+                        break;
+                    }
+                    case InterruptBit::timer: {
+                        pc(timer_);
+                        break;
+                    }
+                    case InterruptBit::serial: {
+                        pc(serial_);
+                        break;
+                    }
+                    case InterruptBit::joypad: {
+                        pc(joypad_);
+                        break;
+                    }
+                    default: std::unreachable();
+                }
+                // tick(4);
+            }
+            else {
+                std::uint8_t instruction = fetch8();
+                op_code_decoder(instruction);
+            }
+        }
+
         // 8 bit register reads
         std::uint8_t a() const {return a_;}
         std::uint8_t b() const {return b_;}
@@ -104,6 +144,8 @@ namespace gb_emulator {
         bool flag_h() const {return f_ & 0x20;}
         bool flag_c() const {return f_ & 0x10;}
 
+        bool IME() {return IME_;}
+
         // constructors
         CPU(Memory& mem, Clock& clock) : IME_{false}, a_{0}, b_{0}, c_{0}, d_{0}, e_{0}, f_{0}, h_{0}, l_{0}, pc_{0}, sp_{0}, halted_{false}, halt_bug_{false}, mem_{mem}, clock_{clock} {}
 
@@ -129,6 +171,12 @@ namespace gb_emulator {
 
         static constexpr std::uint16_t ie_ = 0xFFFF;
         static constexpr std::uint16_t if_ = 0xFF0F;
+
+        static constexpr std::uint16_t vblank_ = 0x40;
+        static constexpr std::uint16_t lcd_ = 0x48;
+        static constexpr std::uint16_t timer_ = 0x50;
+        static constexpr std::uint16_t serial_ = 0x58;
+        static constexpr std::uint16_t joypad_ = 0x60;
 
         // templated parameters
         Memory& mem_;
@@ -195,6 +243,10 @@ namespace gb_emulator {
             return read8(ie_);
         }
 
+        std::uint8_t interrupt_e_no_tick() {
+            return bus_read_no_tick(ie_);
+        }
+
         enum class InterruptBit {
             vblank = 0, lcd = 1, timer = 2, serial = 3, joypad = 4
         };
@@ -214,6 +266,10 @@ namespace gb_emulator {
             return select_bit(bus_read_no_tick(ie_), static_cast<int>(bit));
         }
 
+        void interrupt_e_no_tick(bool change_bit, InterruptBit bit) {
+            bus_write_no_tick(ie_, set_bit(interrupt_e_no_tick(), static_cast<int>(bit), change_bit));
+        }
+
         void interrupt_e(std::uint8_t data) {
             write8(ie_, (data & 0x1F) | 0xE0);
         }
@@ -222,12 +278,37 @@ namespace gb_emulator {
             return read8(if_);
         }
 
+        std::uint8_t interrupt_f_no_tick() {
+            return bus_read_no_tick(if_);
+        }
+
+        void interrupt_f_no_tick(bool change_bit, InterruptBit bit) {
+            bus_write_no_tick(if_, set_bit(interrupt_f_no_tick(), static_cast<int>(bit), change_bit));
+        }
+
+        bool interrupt_not_zero_no_tick() {
+            return (interrupt_e_no_tick() & interrupt_f_no_tick() & 0x1F) != 0;
+        }
+
         bool interrupt_f_no_tick(InterruptBit bit) {
             return select_bit(bus_read_no_tick(if_), static_cast<int>(bit));
         }
 
         void interrupt_f(std::uint8_t data) {
             write8(if_, (data & 0x1F) | 0xE0);
+        }
+
+        bool interrupt() {
+            return IME() & interrupt_not_zero_no_tick();
+        }
+
+        InterruptBit get_smallest_valid_interrupt() {
+            std::uint8_t interrupt_e = interrupt_e_no_tick();
+            std::uint8_t interrupt_f = interrupt_f_no_tick();
+            for (int i{0}; i < 5; i++) {
+                if (select_bit(interrupt_e, i) & select_bit(interrupt_f, i)) return static_cast<InterruptBit>(i);
+            }
+            std::unreachable();
         }
 
         // 8 bit register helpers
