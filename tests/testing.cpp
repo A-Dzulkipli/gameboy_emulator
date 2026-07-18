@@ -1416,11 +1416,11 @@ TEST_CASE("DI / EI / HALT / STOP") {
         CHECK(fx.cpu.halted_ == false);
         CHECK(fx.cpu.halt_bug_ == true);
     }
-    // SUBCASE("STOP consumes extra byte") {
-    //     fx.cpu.pc(0x1000);
-    //     fx.cpu.stop();
-    //     CHECK(fx.cpu.pc() == 0x1001);
-    // }
+    SUBCASE("STOP consumes extra byte") {
+        fx.cpu.pc(0x1000);
+        fx.cpu.stop();
+        CHECK(fx.cpu.pc() == 0x1001);
+    }
 }
 
 TEST_CASE("op_code_decoder dispatch smoke tests") {
